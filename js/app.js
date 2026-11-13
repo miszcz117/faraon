@@ -33,7 +33,7 @@ function buildPanel() {
     el.innerHTML = `<div class="st-head"><b>${NAMES[st]}</b><span class="tag" data-f="over" hidden>nadzorca</span><span class="chip" data-f="chip"></span></div>
       <div class="st-body"><button type="button" class="hand" data-act="click">Popędź</button>
       <span class="cnt"><button type="button" data-act="minus" aria-label="Zabierz ludzi: ${NAMES[st]}">−</button><output data-f="n">0</output><button type="button" data-act="plus" aria-label="Dodaj ludzi: ${NAMES[st]}">+</button></span>
-      <span class="unit">${UNITS[st]}</span><span class="capv" data-f="cap"></span></div>`;
+      <span class="unit">${UNITS[st]}</span><span class="capv" data-f="cap"></span></div><div class="meter"><i data-f="meter"></i></div>`;
     return el;
   };
   const pile = k => { const el = document.createElement('div'); el.className = 'pile'; el.dataset.pile = k; el.innerHTML = `<span>${PILES[k]}</span><div class="bar"><i></i></div><output></output>`; return el; };
@@ -73,6 +73,7 @@ function updateUi() {
     el.querySelector('[data-act=plus]').disabled = g.free() < u;
     el.querySelector('[data-act=minus]').disabled = s.assign[st] < u;
     el.classList.toggle('boost', st !== 'quarry' && st !== 'mason' && g.boost[st] > 0);
+    el.querySelector('[data-f=meter]').style.width = (100 * clamp(st === 'quarry' ? s.wq : st === 'mason' ? s.wm : g.boost[st] / Sim.BASE.boostMax, 0, 1)).toFixed(0) + '%';
   }
   for (const el of document.querySelectorAll('.pile')) {
     const n = s.piles[el.dataset.pile];
@@ -106,6 +107,20 @@ function updateUi() {
 }
 
 /* ---------- messages ---------- */
+/* First-steps hints: each shows once, when the moment it explains actually happens. */
+const HINTS = [
+  ['start', () => true, 'Masz 8 racji. Najmij robotnika (Zakupy) i przydziel go przyciskiem +. Klikaj stacje na mapie, żeby popędzić ludzi.', 16],
+  ['first', s => s.placed >= 1, 'Pierwszy blok leży. Każdy ułożony blok to racje, wyższe warstwy płacą lepiej.', 8],
+  ['full', s => s.placed >= 3 && Object.values(s.piles).some(n => n >= g.cap()), 'Stos pełny: stacja przed nim stoi i marnuje ludzi. Wzmocnij stację za nim albo przesuń tam robotników.', 12],
+  ['team', s => s.racje >= 18 && s.placed >= 6, 'Sanie i układanie biorą ludzi czwórkami. Cztery wolne ręce to nowa ekipa.', 10],
+  ['over', s => s.blocks >= 30 && !s.over.quarry, 'Odblokowany pierwszy nadzorca. Popędza stację za Ciebie i zostaje na zawsze, także po pochówku.', 12],
+  ['great', s => s.workers >= 22 && s.great === 0, 'Masz już sporą załogę. Ekipa wysłana pod Wielką Piramidę nie zarabia racji, ale jej bloki zostają na zawsze i przyspieszają wszystko.', 14],
+  ['bank', s => s.bank >= 600, 'Uzbierał się zapas czasu. Przyciski ×3 i ×10 na dole przyspieszają budowę, dopóki go starczy.', 12]
+];
+function hints() {
+  if (toastT > 0) return;
+  for (const [id, cond, text, secs] of HINTS) if (!g.s.hints[id] && cond(g.s)) { g.s.hints[id] = 1; toast(text, secs); return; }
+}
 let toastT = 0;
 function toast(msg, secs = 5) { const t = $('toast'); t.textContent = msg; t.hidden = false; toastT = secs; }
 function openBurial() {
@@ -185,7 +200,7 @@ cv.addEventListener('pointermove', e => {
 function pointerUp(e) {
   if (downAt && ptrs.size === 1 && downAt.moved <= 6 && performance.now() - downAt.t < 500) {
     const r = cv.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top, st = Scene.hit(sx, sy);
-    if (st) { g.click(st); Scene.chips(sx, sy); }
+    if (st) { g.click(st); Scene.chips(sx, sy); updateUi(); }
   }
   ptrs.delete(e.pointerId); pinch = 0; downAt = null; if (!ptrs.size) cv.classList.remove('drag');
 }
@@ -243,7 +258,7 @@ function frame(now) {
   }
   g.events.length = 0;
   Scene.render(now);
-  uiT += real; if (uiT > 0.2) { uiT = 0; updateUi(); save(false); }
+  uiT += real; if (uiT > 0.2) { uiT = 0; updateUi(); hints(); save(false); }
   if (toastT > 0) { toastT -= real; if (toastT <= 0) $('toast').hidden = true; }
   requestAnimationFrame(frame);
 }
@@ -263,7 +278,6 @@ function start(hot) {
   else if (!saved) {                                                  // a new game opens on the thesis: the whole plateau, then down to the site
     Object.assign(cam, Scene.views.great());
     setTimeout(() => { if (!ptrs.size && !camAnim) flyTo(Scene.views.site(), 3.2); }, 2200);
-    toast('Klikaj kamieniołom, sanie, kamieniarzy i budowę, żeby ich popędzić. Ludzi przesuwasz w panelu po prawej.', 14);
   } else Object.assign(cam, Scene.views.site());
   if (!started) { started = true; addEventListener('resize', fit); requestAnimationFrame(t => { last = t; frame(t); }); cloudInit(); }
 }

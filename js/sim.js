@@ -49,7 +49,7 @@ function locate(st, m) {
 
 function fresh() {
   return {
-    v: 1, t: 0, played: 0, savedAt: 0, reign: 1, project: 'mastaba', siteY: 0, placed: 0, great: 0, racje: 0, workers: 10,
+    v: 1, t: 0, played: 0, savedAt: 0, reign: 1, project: 'mastaba', siteY: 0, placed: 0, great: 0, racje: 8, workers: 10, hints: {},
     assign: { quarry: 1, haul: 4, mason: 1, place: 4, great: 0 }, piles: { A: 3, B: 2, C: 3 },
     lvl: { quarry: 0, haul: 0, mason: 0, place: 0, great: 0, pile: 0, hand: 0 }, over: {}, wq: 0, wm: 0,
     ka: 0, kaLvl: { speed: 0, crew: 0, racje: 0 }, tombs: [], blocks: 0, clicks: 0, bank: 0
