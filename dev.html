@@ -1,0 +1,231 @@
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0;font:14px system-ui}[hidden]{display:none!important}</style></head><body>
+<!-- Generated from index.html; edit that file. -->
+<title>Faraon</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: one full-viewport diorama canvas; lapis plaques float over the sand, the build panel docks on the right. */
+:root{
+  --sand:#E9CD8C;
+  --lapis:#15283B;
+  --lapis-2:#234462;
+  --lapis-3:#1B3550;
+  --gold:#EDBE45;
+  --papyrus:#F7ECCB;
+  --dim:#B4C0CB;
+  --ink:#4A2E16;
+  --warn:#F0916B;
+  --ok:#9BD18B;
+  --font-display:'Marcellus','Palatino Linotype',Georgia,serif;
+  --font-body:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--sand);color:var(--papyrus);font:13px/1.35 var(--font-body);overflow:hidden}
+#stage{position:relative;height:100%;overflow:hidden}
+#scene{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#scene.drag{cursor:grabbing}
+.hud{
+  position:absolute;inset:0;pointer-events:none;
+  display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(0,1fr) auto;gap:10px;
+  padding-block:12px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.plaque{
+  pointer-events:auto;background:var(--lapis);color:var(--papyrus);
+  border:1px solid var(--lapis-2);border-bottom:3px solid var(--gold);
+  box-shadow:0 6px 18px rgba(74,46,22,.28);
+}
+.top{grid-column:1;grid-row:1;display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;min-width:0}
+.brand{padding:7px 14px 8px}
+.brand h1{margin:0;font:400 22px/1.1 var(--font-display);letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+.brand p{margin:2px 0 0;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+.res{display:flex;gap:18px;padding:7px 14px;align-items:center}
+.res div{display:grid}
+.res span{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.res b{font:400 19px/1.15 var(--font-display);font-variant-numeric:tabular-nums}
+
+.panel{grid-column:2;grid-row:1 / span 3;width:min(336px,calc(100vw - 32px));display:flex;flex-direction:column;min-height:0;align-self:start;max-height:100%}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--lapis-2)}
+.panel-head h2{margin:0;font:400 16px var(--font-display);letter-spacing:.06em}
+.panel-body{overflow-y:auto;min-height:0;padding:10px 12px 12px;display:grid;gap:14px}
+.panel.shut .panel-body{display:none}
+h3{margin:0 0 6px;font:500 10.5px var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--gold)}
+.goal{display:grid;grid-template-columns:1fr auto;gap:3px 8px;align-items:baseline}
+.goal b{font:400 15px var(--font-display)}
+.goal output{font:400 15px var(--font-display);font-variant-numeric:tabular-nums}
+.goal .bar,.goal small,.goal button{grid-column:1 / -1}
+.bar{height:5px;background:var(--lapis-2)}
+.bar i{display:block;height:100%;width:0;background:var(--gold)}
+small,.note{font-size:11.5px;color:var(--dim);margin:0}
+.chain{display:grid;gap:4px}
+.st{background:var(--lapis-3);padding:6px 8px;border-left:3px solid var(--lapis-2)}
+.st.boost{border-left-color:var(--gold)}
+.st-head{display:flex;align-items:center;gap:6px;min-height:18px}
+.st-head b{font-weight:600}
+.tag{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--lapis);background:var(--gold);padding:0 5px}
+.chip{margin-left:auto;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase}
+.chip.hot{color:var(--gold)}.chip.warn{color:var(--warn)}.chip.dim{color:var(--dim)}
+.st-body{display:flex;align-items:center;gap:8px;margin-top:5px}
+.cnt{display:inline-flex;align-items:center}
+.cnt output{min-width:26px;text-align:center;font:400 16px var(--font-display);font-variant-numeric:tabular-nums}
+.unit{color:var(--dim);font-size:11.5px}
+.capv{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--papyrus)}
+.pile{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:1px 8px 1px 14px;font-size:11px;color:var(--dim)}
+.pile output{font-variant-numeric:tabular-nums;color:var(--papyrus);min-width:34px;text-align:right}
+.pile .bar i{background:var(--ok)}
+.pile.full .bar i{background:var(--warn)}
+.pile.full output{color:var(--warn)}
+button{font:500 12.5px var(--font-body);color:var(--papyrus);background:var(--lapis-2);border:1px solid transparent;padding:5px 9px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--gold)}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+button[aria-pressed="true"]{background:var(--gold);color:var(--lapis)}
+.cnt button{width:26px;height:26px;padding:0;font-size:16px;line-height:1}
+.hand{background:var(--gold);color:var(--lapis);font-weight:600}
+.shop{display:grid;gap:4px}
+.buy{display:grid;grid-template-columns:1fr auto;gap:0 10px;text-align:left;padding:6px 9px;width:100%}
+.buy .lab{font-weight:600}
+.buy .sub{grid-column:1;font-size:11px;color:var(--dim);font-weight:400}
+.buy .cost{grid-column:2;grid-row:1 / span 2;align-self:center;font:400 16px var(--font-display);font-variant-numeric:tabular-nums;color:var(--gold)}
+.buy.owned{opacity:.8}.buy.owned .cost{color:var(--ok)}
+.primary{background:var(--gold);color:var(--lapis);font-weight:600;padding:8px 12px}
+
+.dock{grid-column:1;grid-row:3;justify-self:center;display:flex;flex-wrap:wrap;gap:8px 18px;padding:7px 12px;align-items:center;justify-content:center;max-width:100%}
+.grp{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.grp>span{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-right:4px}
+.grp b{font:400 15px var(--font-display);margin-right:6px;font-variant-numeric:tabular-nums}
+.toast{grid-column:1;grid-row:2;align-self:end;justify-self:center;margin:0;max-width:min(560px,100%);font-size:13px;color:var(--ink);background:rgba(247,236,203,.92);padding:7px 14px;border-left:3px solid var(--gold);box-shadow:0 4px 14px rgba(74,46,22,.25)}
+
+.veil{position:absolute;inset:0;background:rgba(21,40,59,.55);display:grid;place-items:center;padding:16px;overflow:auto}
+.card{width:min(480px,100%);padding:18px 20px;display:grid;gap:12px}
+.card h2{margin:0;font:400 24px var(--font-display);color:var(--gold);text-wrap:balance}
+.card p{margin:0;max-width:60ch}
+.gain{font:400 34px var(--font-display);color:var(--gold)}
+.keep{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.keep ul{margin:4px 0 0;padding-left:16px;color:var(--dim)}
+textarea{width:100%;min-height:74px;background:var(--lapis-3);color:var(--papyrus);border:1px solid var(--lapis-2);font:11px ui-monospace,Menlo,monospace;padding:6px;resize:vertical}
+.rowb{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+@media (max-width:760px){
+  .hud{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto}
+  .panel{grid-column:1;grid-row:4;width:100%;max-height:44vh}
+  .dock{grid-row:3}
+  .brand h1{font-size:18px}
+  .keep{grid-template-columns:1fr}
+}
+</style>
+
+<div id="stage">
+  <canvas id="scene" role="img" aria-label="Dolina w rzucie izometrycznym: kamieniołom, plac kamieniarzy, grobowiec w budowie, wioska nad Nilem i obrys Wielkiej Piramidy"></canvas>
+  <div class="hud">
+    <div class="top">
+      <header class="plaque brand">
+        <h1>Faraon</h1>
+        <p id="reignLine">Panowanie I · Mastaba</p>
+      </header>
+      <section class="plaque res" aria-label="Zasoby">
+        <div title="Chleb i piwo dla załogi. Dostajesz je za każdy blok ułożony w grobowcu."><span>Racje</span><b id="rRacje">0</b></div>
+        <div title="Wolni / wszyscy. Wolni czekają pod spichlerzem."><span>Wolni robotnicy</span><b id="rFree">0 / 10</b></div>
+        <div id="rKaBox" hidden title="Zostaje po pochówku faraona. Kupujesz za nie trwałe ulepszenia."><span>Ka</span><b id="rKa">0</b></div>
+      </section>
+    </div>
+
+    <aside class="plaque panel" id="panel" aria-label="Budowa">
+      <div class="panel-head">
+        <h2>Budowa</h2>
+        <button type="button" id="panelToggle" aria-expanded="true" aria-controls="panelBody">Zwiń</button>
+      </div>
+      <div class="panel-body" id="panelBody">
+        <section class="goal">
+          <b id="tombName">Mastaba</b><output id="tombVal">0 / 278</output>
+          <div class="bar"><i id="tombBar"></i></div>
+          <small id="tombRate"></small>
+          <button type="button" class="primary" id="buryBtn" hidden>Pochowaj faraona</button>
+        </section>
+        <section>
+          <h3>Łańcuch kamienia</h3>
+          <div class="chain" id="chain"></div>
+        </section>
+        <section class="goal">
+          <b>Wielka Piramida</b><output id="greatVal">0</output>
+          <small id="greatEta"></small>
+          <small id="greatBonus"></small>
+        </section>
+        <section>
+          <h3>Zakupy za racje</h3>
+          <div class="shop" id="shop"></div>
+        </section>
+        <section>
+          <h3>Nadzorcy</h3>
+          <div class="shop" id="overseers"></div>
+        </section>
+        <section id="kaSec" hidden>
+          <h3>Trwałe, za Ka</h3>
+          <div class="shop" id="kaShop"></div>
+        </section>
+      </div>
+    </aside>
+
+    <p class="toast" id="toast" role="status" hidden></p>
+
+    <nav class="plaque dock" aria-label="Widok, czas i zapis">
+      <div class="grp"><span>Widok</span>
+        <button type="button" data-view="site">Budowa</button>
+        <button type="button" data-view="valley">Dolina</button>
+        <button type="button" data-view="great">Wielka</button>
+      </div>
+      <div class="grp" title="Kiedy gra jest zamknięta albo karta schowana, budowa stoi, a czas odkłada się tutaj. Wydajesz go na przyspieszenie."><span>Zapas czasu</span><b id="bankVal">0 s</b>
+        <button type="button" data-warp="1" aria-pressed="true">×1</button>
+        <button type="button" data-warp="3" aria-pressed="false">×3</button>
+        <button type="button" data-warp="10" aria-pressed="false">×10</button>
+      </div>
+      <div class="grp"><button type="button" id="menuBtn">Zapis</button></div>
+    </nav>
+  </div>
+
+  <div class="veil" id="burial" hidden>
+    <div class="plaque card" role="dialog" aria-labelledby="burialTitle">
+      <h2 id="burialTitle">Mastaba ukończona</h2>
+      <p>Faraon spocznie w swoim grobowcu. Jego następca zaczyna budowę od nowa, ale nie od zera.</p>
+      <div class="gain" id="burialGain">+10 Ka</div>
+      <div class="keep">
+        <div><h3>Zostaje</h3><ul><li>grobowiec w dolinie</li><li>nadzorcy</li><li>Ka i to, co za nie kupisz</li><li>bloki Wielkiej Piramidy</li><li>zapas czasu</li></ul></div>
+        <div><h3>Przepada</h3><ul><li>racje</li><li>najęci robotnicy</li><li>narzędzia, stosy, wprawna ręka</li></ul></div>
+      </div>
+      <h3>Co buduje następca</h3>
+      <div class="shop" id="burialNext"></div>
+      <div class="rowb"><button type="button" id="burialLater">Jeszcze nie teraz</button></div>
+    </div>
+  </div>
+
+  <div class="veil" id="menu" hidden>
+    <div class="plaque card" role="dialog" aria-labelledby="menuTitle">
+      <h2 id="menuTitle">Zapis gry</h2>
+      <p id="saveWhere">Zapis: w tej przeglądarce.</p>
+      <div class="rowb">
+        <button type="button" class="primary" id="exportBtn">Eksportuj do pliku</button>
+        <label for="importFile">Wczytaj z pliku: </label><input type="file" id="importFile" accept=".json,application/json">
+      </div>
+      <label for="saveText">Albo wklej tu tekst zapisu:</label>
+      <textarea id="saveText" spellcheck="false"></textarea>
+      <div class="rowb">
+        <button type="button" id="importBtn">Wczytaj wklejony zapis</button>
+        <button type="button" id="resetBtn">Zacznij od zera</button>
+        <button type="button" id="menuClose">Zamknij</button>
+      </div>
+      <div class="rowb" id="resetAsk" hidden>
+        <span>Na pewno? Przepadnie wszystko, także Wielka Piramida.</span>
+        <button type="button" id="resetYes">Tak, od zera</button>
+        <button type="button" id="resetNo">Nie</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/sim.js"></script>
+<script src="js/gfx.js"></script>
+<script src="js/scene.js"></script>
+<script src="js/app.js"></script>
+</body></html>

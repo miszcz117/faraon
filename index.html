@@ -2,28 +2,31 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600&display=swap">
 <style>
-/* Layout: one full-viewport diorama canvas; lapis plaques float in the corners over the sand. */
+/* Layout: one full-viewport diorama canvas; lapis plaques float over the sand, the build panel docks on the right. */
 :root{
   --sand:#E9CD8C;
   --lapis:#15283B;
   --lapis-2:#234462;
+  --lapis-3:#1B3550;
   --gold:#EDBE45;
   --papyrus:#F7ECCB;
-  --papyrus-dim:#B9C3CC;
+  --dim:#B4C0CB;
   --ink:#4A2E16;
+  --warn:#F0916B;
+  --ok:#9BD18B;
   --font-display:'Marcellus','Palatino Linotype',Georgia,serif;
   --font-body:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
-  color-scheme:light;
+  color-scheme:dark;
 }
 html,body{height:100%}
-body{background:var(--sand);color:var(--papyrus);font-family:var(--font-body);overflow:hidden}
+body{background:var(--sand);color:var(--papyrus);font:13px/1.35 var(--font-body);overflow:hidden}
 #stage{position:relative;height:100%;overflow:hidden}
 #scene{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
 #scene.drag{cursor:grabbing}
 .hud{
   position:absolute;inset:0;pointer-events:none;
-  display:grid;grid-template-columns:1fr auto;grid-template-rows:auto 1fr auto;gap:10px;
-  padding-block:14px;
+  display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(0,1fr) auto;gap:10px;
+  padding-block:12px;
   padding-left:max(16px,env(safe-area-inset-left,0px));
   padding-right:max(16px,env(safe-area-inset-right,0px));
 }
@@ -32,1029 +35,194 @@ body{background:var(--sand);color:var(--papyrus);font-family:var(--font-body);ov
   border:1px solid var(--lapis-2);border-bottom:3px solid var(--gold);
   box-shadow:0 6px 18px rgba(74,46,22,.28);
 }
-.brand{justify-self:start;align-self:start;padding:8px 16px 9px}
-.brand h1{margin:0;font-family:var(--font-display);font-weight:400;font-size:26px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);line-height:1.1}
-.brand p{margin:2px 0 0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--papyrus-dim)}
-.tally{justify-self:end;align-self:start;padding:10px 14px;min-width:0;width:min(290px,100%);display:grid;gap:10px}
-.tally .row{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:baseline}
-.tally .lab{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--papyrus-dim)}
-.tally .val{font-family:var(--font-display);font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
-.tally .bar{grid-column:1/-1;height:5px;background:var(--lapis-2)}
-.tally .bar i{display:block;height:100%;width:0;background:var(--gold)}
-.tally small{grid-column:1/-1;font-size:11.5px;color:var(--papyrus-dim)}
-.dock{grid-column:1/-1;grid-row:3;justify-self:center;display:flex;flex-wrap:wrap;gap:8px 18px;padding:8px 12px;align-items:center;justify-content:center;max-width:100%}
-.grp{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
-.grp span{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--papyrus-dim);margin-right:4px}
-button{
-  font:500 13px var(--font-body);color:var(--papyrus);background:var(--lapis-2);
-  border:1px solid transparent;padding:6px 11px;cursor:pointer;
-}
-button:hover{border-color:var(--gold)}
+.top{grid-column:1;grid-row:1;display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;min-width:0}
+.brand{padding:7px 14px 8px}
+.brand h1{margin:0;font:400 22px/1.1 var(--font-display);letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+.brand p{margin:2px 0 0;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+.res{display:flex;gap:18px;padding:7px 14px;align-items:center}
+.res div{display:grid}
+.res span{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.res b{font:400 19px/1.15 var(--font-display);font-variant-numeric:tabular-nums}
+
+.panel{grid-column:2;grid-row:1 / span 3;width:min(336px,calc(100vw - 32px));display:flex;flex-direction:column;min-height:0;align-self:start;max-height:100%}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--lapis-2)}
+.panel-head h2{margin:0;font:400 16px var(--font-display);letter-spacing:.06em}
+.panel-body{overflow-y:auto;min-height:0;padding:10px 12px 12px;display:grid;gap:14px}
+.panel.shut .panel-body{display:none}
+h3{margin:0 0 6px;font:500 10.5px var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--gold)}
+.goal{display:grid;grid-template-columns:1fr auto;gap:3px 8px;align-items:baseline}
+.goal b{font:400 15px var(--font-display)}
+.goal output{font:400 15px var(--font-display);font-variant-numeric:tabular-nums}
+.goal .bar,.goal small,.goal button{grid-column:1 / -1}
+.bar{height:5px;background:var(--lapis-2)}
+.bar i{display:block;height:100%;width:0;background:var(--gold)}
+small,.note{font-size:11.5px;color:var(--dim);margin:0}
+.chain{display:grid;gap:4px}
+.st{background:var(--lapis-3);padding:6px 8px;border-left:3px solid var(--lapis-2)}
+.st.boost{border-left-color:var(--gold)}
+.st-head{display:flex;align-items:center;gap:6px;min-height:18px}
+.st-head b{font-weight:600}
+.tag{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--lapis);background:var(--gold);padding:0 5px}
+.chip{margin-left:auto;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase}
+.chip.hot{color:var(--gold)}.chip.warn{color:var(--warn)}.chip.dim{color:var(--dim)}
+.st-body{display:flex;align-items:center;gap:8px;margin-top:5px}
+.cnt{display:inline-flex;align-items:center}
+.cnt output{min-width:26px;text-align:center;font:400 16px var(--font-display);font-variant-numeric:tabular-nums}
+.unit{color:var(--dim);font-size:11.5px}
+.capv{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--papyrus)}
+.pile{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:1px 8px 1px 14px;font-size:11px;color:var(--dim)}
+.pile output{font-variant-numeric:tabular-nums;color:var(--papyrus);min-width:34px;text-align:right}
+.pile .bar i{background:var(--ok)}
+.pile.full .bar i{background:var(--warn)}
+.pile.full output{color:var(--warn)}
+button{font:500 12.5px var(--font-body);color:var(--papyrus);background:var(--lapis-2);border:1px solid transparent;padding:5px 9px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--gold)}
 button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
 button[aria-pressed="true"]{background:var(--gold);color:var(--lapis)}
-.hint{grid-column:1/-1;grid-row:2;align-self:end;justify-self:center;margin:0;font-size:12px;color:var(--ink);background:rgba(247,236,203,.72);padding:4px 10px}
-@media (max-width:560px){
-  .hud{grid-template-columns:1fr}
-  .tally{justify-self:start}
-  .brand h1{font-size:21px}
+.cnt button{width:26px;height:26px;padding:0;font-size:16px;line-height:1}
+.hand{background:var(--gold);color:var(--lapis);font-weight:600}
+.shop{display:grid;gap:4px}
+.buy{display:grid;grid-template-columns:1fr auto;gap:0 10px;text-align:left;padding:6px 9px;width:100%}
+.buy .lab{font-weight:600}
+.buy .sub{grid-column:1;font-size:11px;color:var(--dim);font-weight:400}
+.buy .cost{grid-column:2;grid-row:1 / span 2;align-self:center;font:400 16px var(--font-display);font-variant-numeric:tabular-nums;color:var(--gold)}
+.buy.owned{opacity:.8}.buy.owned .cost{color:var(--ok)}
+.primary{background:var(--gold);color:var(--lapis);font-weight:600;padding:8px 12px}
+
+.dock{grid-column:1;grid-row:3;justify-self:center;display:flex;flex-wrap:wrap;gap:8px 18px;padding:7px 12px;align-items:center;justify-content:center;max-width:100%}
+.grp{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.grp>span{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-right:4px}
+.grp b{font:400 15px var(--font-display);margin-right:6px;font-variant-numeric:tabular-nums}
+.toast{grid-column:1;grid-row:2;align-self:end;justify-self:center;margin:0;max-width:min(560px,100%);font-size:13px;color:var(--ink);background:rgba(247,236,203,.92);padding:7px 14px;border-left:3px solid var(--gold);box-shadow:0 4px 14px rgba(74,46,22,.25)}
+
+.veil{position:absolute;inset:0;background:rgba(21,40,59,.55);display:grid;place-items:center;padding:16px;overflow:auto}
+.card{width:min(480px,100%);padding:18px 20px;display:grid;gap:12px}
+.card h2{margin:0;font:400 24px var(--font-display);color:var(--gold);text-wrap:balance}
+.card p{margin:0;max-width:60ch}
+.gain{font:400 34px var(--font-display);color:var(--gold)}
+.keep{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.keep ul{margin:4px 0 0;padding-left:16px;color:var(--dim)}
+textarea{width:100%;min-height:74px;background:var(--lapis-3);color:var(--papyrus);border:1px solid var(--lapis-2);font:11px ui-monospace,Menlo,monospace;padding:6px;resize:vertical}
+.rowb{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+@media (max-width:760px){
+  .hud{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto}
+  .panel{grid-column:1;grid-row:4;width:100%;max-height:44vh}
+  .dock{grid-row:3}
+  .brand h1{font-size:18px}
+  .keep{grid-template-columns:1fr}
 }
 </style>
 
 <div id="stage">
-  <canvas id="scene" role="img" aria-label="Plac budowy w rzucie izometrycznym: mastaba rosnąca blok po bloku, kamieniołom, wioska i Nil"></canvas>
+  <canvas id="scene" role="img" aria-label="Dolina w rzucie izometrycznym: kamieniołom, plac kamieniarzy, grobowiec w budowie, wioska nad Nilem i obrys Wielkiej Piramidy"></canvas>
   <div class="hud">
-    <header class="plaque brand">
-      <h1>Faraon</h1>
-      <p>Studium wyglądu · panowanie I</p>
-    </header>
-    <section class="plaque tally" aria-live="off">
-      <div class="row">
-        <span class="lab">Mastaba</span><span class="val" id="vM">0 / 278</span>
-        <div class="bar"><i id="bM"></i></div>
+    <div class="top">
+      <header class="plaque brand">
+        <h1>Faraon</h1>
+        <p id="reignLine">Panowanie I · Mastaba</p>
+      </header>
+      <section class="plaque res" aria-label="Zasoby">
+        <div title="Chleb i piwo dla załogi. Dostajesz je za każdy blok ułożony w grobowcu."><span>Racje</span><b id="rRacje">0</b></div>
+        <div title="Wolni / wszyscy. Wolni czekają pod spichlerzem."><span>Wolni robotnicy</span><b id="rFree">0 / 10</b></div>
+        <div id="rKaBox" hidden title="Zostaje po pochówku faraona. Kupujesz za nie trwałe ulepszenia."><span>Ka</span><b id="rKa">0</b></div>
+      </section>
+    </div>
+
+    <aside class="plaque panel" id="panel" aria-label="Budowa">
+      <div class="panel-head">
+        <h2>Budowa</h2>
+        <button type="button" id="panelToggle" aria-expanded="true" aria-controls="panelBody">Zwiń</button>
       </div>
-      <div class="row">
-        <span class="lab">Wielka Piramida</span><span class="val" id="vG">0 / 72 180 100</span>
-        <small id="eta">w tym tempie: liczę…</small>
+      <div class="panel-body" id="panelBody">
+        <section class="goal">
+          <b id="tombName">Mastaba</b><output id="tombVal">0 / 278</output>
+          <div class="bar"><i id="tombBar"></i></div>
+          <small id="tombRate"></small>
+          <button type="button" class="primary" id="buryBtn" hidden>Pochowaj faraona</button>
+        </section>
+        <section>
+          <h3>Łańcuch kamienia</h3>
+          <div class="chain" id="chain"></div>
+        </section>
+        <section class="goal">
+          <b>Wielka Piramida</b><output id="greatVal">0</output>
+          <small id="greatEta"></small>
+          <small id="greatBonus"></small>
+        </section>
+        <section>
+          <h3>Zakupy za racje</h3>
+          <div class="shop" id="shop"></div>
+        </section>
+        <section>
+          <h3>Nadzorcy</h3>
+          <div class="shop" id="overseers"></div>
+        </section>
+        <section id="kaSec" hidden>
+          <h3>Trwałe, za Ka</h3>
+          <div class="shop" id="kaShop"></div>
+        </section>
       </div>
-    </section>
-    <p class="hint" id="hint">Przeciągnij, żeby przesunąć. Kółko myszy przybliża.</p>
-    <nav class="plaque dock" aria-label="Widok i tempo">
+    </aside>
+
+    <p class="toast" id="toast" role="status" hidden></p>
+
+    <nav class="plaque dock" aria-label="Widok, czas i zapis">
       <div class="grp"><span>Widok</span>
-        <button id="vSite" type="button">Budowa</button>
-        <button id="vValley" type="button">Dolina</button>
-        <button id="vGreat" type="button">Wielka Piramida</button>
+        <button type="button" data-view="site">Budowa</button>
+        <button type="button" data-view="valley">Dolina</button>
+        <button type="button" data-view="great">Wielka</button>
       </div>
-      <div class="grp"><span>Tempo</span>
-        <button id="s1" type="button" aria-pressed="true">×1</button>
-        <button id="s4" type="button" aria-pressed="false">×4</button>
-        <button id="s16" type="button" aria-pressed="false">×16</button>
-        <button id="again" type="button" hidden>Od nowa</button>
+      <div class="grp" title="Kiedy gra jest zamknięta albo karta schowana, budowa stoi, a czas odkłada się tutaj. Wydajesz go na przyspieszenie."><span>Zapas czasu</span><b id="bankVal">0 s</b>
+        <button type="button" data-warp="1" aria-pressed="true">×1</button>
+        <button type="button" data-warp="3" aria-pressed="false">×3</button>
+        <button type="button" data-warp="10" aria-pressed="false">×10</button>
       </div>
+      <div class="grp"><button type="button" id="menuBtn">Zapis</button></div>
     </nav>
+  </div>
+
+  <div class="veil" id="burial" hidden>
+    <div class="plaque card" role="dialog" aria-labelledby="burialTitle">
+      <h2 id="burialTitle">Mastaba ukończona</h2>
+      <p>Faraon spocznie w swoim grobowcu. Jego następca zaczyna budowę od nowa, ale nie od zera.</p>
+      <div class="gain" id="burialGain">+10 Ka</div>
+      <div class="keep">
+        <div><h3>Zostaje</h3><ul><li>grobowiec w dolinie</li><li>nadzorcy</li><li>Ka i to, co za nie kupisz</li><li>bloki Wielkiej Piramidy</li><li>zapas czasu</li></ul></div>
+        <div><h3>Przepada</h3><ul><li>racje</li><li>najęci robotnicy</li><li>narzędzia, stosy, wprawna ręka</li></ul></div>
+      </div>
+      <h3>Co buduje następca</h3>
+      <div class="shop" id="burialNext"></div>
+      <div class="rowb"><button type="button" id="burialLater">Jeszcze nie teraz</button></div>
+    </div>
+  </div>
+
+  <div class="veil" id="menu" hidden>
+    <div class="plaque card" role="dialog" aria-labelledby="menuTitle">
+      <h2 id="menuTitle">Zapis gry</h2>
+      <p id="saveWhere">Zapis: w tej przeglądarce.</p>
+      <div class="rowb">
+        <button type="button" class="primary" id="exportBtn">Eksportuj do pliku</button>
+        <label for="importFile">Wczytaj z pliku: </label><input type="file" id="importFile" accept=".json,application/json">
+      </div>
+      <label for="saveText">Albo wklej tu tekst zapisu:</label>
+      <textarea id="saveText" spellcheck="false"></textarea>
+      <div class="rowb">
+        <button type="button" id="importBtn">Wczytaj wklejony zapis</button>
+        <button type="button" id="resetBtn">Zacznij od zera</button>
+        <button type="button" id="menuClose">Zamknij</button>
+      </div>
+      <div class="rowb" id="resetAsk" hidden>
+        <span>Na pewno? Przepadnie wszystko, także Wielka Piramida.</span>
+        <button type="button" id="resetYes">Tak, od zera</button>
+        <button type="button" id="resetNo">Nie</button>
+      </div>
+    </div>
   </div>
 </div>
 
-<script>
-(() => {
-'use strict';
-/* ============================================================
-   ONE WORLD, ONE SCALE
-   Unit = one block width (~1.2 m). Everything is defined in these
-   units and goes through the single projection P(). Nothing is
-   drawn "by eye" in pixels except as a multiple of cam.T.
-   Projection: true 2:1 dimetric (camera elevation 30 deg):
-     ground diamond is T wide and T/2 tall, one unit of height
-     is ZK*T pixels.
-   ============================================================ */
-const cv = document.getElementById('scene');
-const ctx = cv.getContext('2d');
-let W = 800, H = 600, DPR = 1;
-const ZK = 0.6124;
-const BH = 0.635;            // block height in units (gives the real 51.8 deg slope with half-block insets)
-const HUMAN = 1.45;          // a person, in the same units
-const cam = { x: 15, y: 1.5, T: 34 };
-
-const P = (x, y, z = 0) => [
-  W / 2 + ((x - cam.x) - (y - cam.y)) * cam.T * 0.5,
-  H / 2 + ((x - cam.x) + (y - cam.y)) * cam.T * 0.25 - z * cam.T * ZK
-];
-function unproj(sx, sy, z = 0) {
-  const a = (sx - W / 2) / (cam.T * 0.5), b = (sy - H / 2 + z * cam.T * ZK) / (cam.T * 0.25);
-  return [cam.x + (a + b) / 2, cam.y + (b - a) / 2];
-}
-function visBox(z = 0, pad = 2) {
-  const c = [unproj(0, 0, z), unproj(W, 0, z), unproj(0, H, z), unproj(W, H, z)];
-  return {
-    x0: Math.min(c[0][0], c[1][0], c[2][0], c[3][0]) - pad, x1: Math.max(c[0][0], c[1][0], c[2][0], c[3][0]) + pad,
-    y0: Math.min(c[0][1], c[1][1], c[2][1], c[3][1]) - pad, y1: Math.max(c[0][1], c[1][1], c[2][1], c[3][1]) + pad
-  };
-}
-
-/* ---------- small utilities ---------- */
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const lerp = (a, b, t) => a + (b - a) * t;
-function hsh(a, b, c = 0) {
-  let h = (Math.imul(a | 0, 374761393) + Math.imul(b | 0, 668265263) + Math.imul(c | 0, 1274126177)) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-const shadeCache = new Map();
-function shade(hex, amt) {            // amt -1..1 : darker..lighter
-  const q = Math.round(amt * 40);
-  const key = hex + q;
-  let v = shadeCache.get(key);
-  if (v) return v;
-  const n = parseInt(hex.slice(1), 16);
-  let r = n >> 16, g = (n >> 8) & 255, b = n & 255;
-  const a = q / 40;
-  if (a >= 0) { r += (255 - r) * a; g += (255 - g) * a; b += (255 - b) * a; }
-  else { r *= 1 + a; g *= 1 + a; b *= 1 + a; }
-  v = `rgb(${r | 0},${g | 0},${b | 0})`;
-  shadeCache.set(key, v);
-  return v;
-}
-function mix(h1, h2, t) {
-  const a = parseInt(h1.slice(1), 16), b = parseInt(h2.slice(1), 16);
-  const r = lerp(a >> 16, b >> 16, t), g = lerp((a >> 8) & 255, (b >> 8) & 255, t), bl = lerp(a & 255, b & 255, t);
-  return `rgb(${r | 0},${g | 0},${bl | 0})`;
-}
-
-/* ---------- palette (canvas world) ---------- */
-const INK = '#4A2E16';
-const C = {
-  sand: '#E9CD8C', sandL: '#F2DCA4', sandD: '#D7B670', road: '#D9BB7A', rut: '#C3A261',
-  stone: { t: '#FBF2D8', l: '#EBDCB2', r: '#C8B283' },
-  raw:   { t: '#E6DABD', l: '#D2C29D', r: '#AF9D76' },
-  rock:  { t: '#E2C78F', l: '#F1E6CB', r: '#C9B88F' },
-  mud:   { t: '#DDB77E', l: '#C99C60', r: '#A47A44' },
-  ramp:  { t: '#CFA36B', l: '#B98A53', r: '#98703F' },
-  wood:  { t: '#B98450', l: '#9C6A3A', r: '#7C5229' },
-  water: '#3FA9B6', waterD: '#2C8FA3', waterL: '#9ADADB',
-  green: '#86B84F', greenD: '#6CA23E', wheat: '#DCC555', damp: '#C7AE66',
-  palm: '#3E8E3B', palmD: '#2E7533', trunk: '#8A5A2B',
-  skin: '#A9683A', skinD: '#8A522B', kilt: '#FFF8E6', hair: '#2A1B12',
-  shadow: 'rgba(96,60,20,0.22)'
-};
-
-/* ---------- painted assets (art/*.webp). Until a file loads, that thing is drawn flat. ---------- */
-const SPR = {
-  palm_a: { w: 280, h: 420, ax: 126.9, ay: 418 }, palm_b: { w: 261, h: 380, ax: 91.3, ay: 378 },
-  palm_c: { w: 418, h: 420, ax: 200, ay: 418 }, reeds: { w: 222, h: 220, ax: 110, ay: 218 },
-  house_a: { w: 420, h: 430, ax: 209.6, ay: 421.2 }, house_b: { w: 520, h: 510, ax: 263.8, ay: 507.3 },
-  hut: { w: 440, h: 545, ax: 170.8, ay: 495.4 }, granary: { w: 520, h: 464, ax: 262.5, ay: 419.5 },
-  workshop: { w: 460, h: 509, ax: 232.7, ay: 489.6 }, boat: { w: 420, h: 416, ax: 210, ay: 324.5 }
-};
-// units = how many world units one repeat of the texture covers
-const TEX = { sand: { units: 26 }, water: { units: 22 }, grass: { units: 14 }, crops: { units: 6 }, wheat: { units: 6 }, stone: { units: 5 }, strata: { units: 9 }, earth: { units: 8 } };
-for (const k in SPR) { const m = SPR[k], im = new Image(); im.onload = () => { m.ok = true; }; im.src = `art/${k}.webp`; m.img = im; }
-for (const k in TEX) for (const lv of ['hi', 'lo']) {
-  const im = new Image();
-  im.onload = () => { TEX[k][lv] = { pat: ctx.createPattern(im, 'repeat'), px: im.naturalWidth }; };
-  im.src = `art/${k}${lv === 'lo' ? '_lo' : ''}.webp`;
-}
-function texLevel(name) {
-  const t = TEX[name]; if (!t) return null;
-  if (t.lo && (!t.hi || cam.T * t.units * 0.56 / t.hi.px < 0.45)) return t.lo;
-  return t.hi || null;
-}
-// The three planes a texture can lie on, as canvas matrices: the ground at height z, a wall facing +y, a wall facing +x.
-const matGround = (z = 0) => { const T = cam.T; return [T / 2, T / 4, -T / 2, T / 4, W / 2 - (cam.x - cam.y) * T / 2, H / 2 - (cam.x + cam.y) * T / 4 - z * T * ZK]; };
-const matFaceY = Y => { const T = cam.T; return [T / 2, T / 4, 0, -T * ZK, W / 2 - (cam.x + Y - cam.y) * T / 2, H / 2 + (Y - cam.x - cam.y) * T / 4]; };
-const matFaceX = X => { const T = cam.T; return [-T / 2, T / 4, 0, -T * ZK, W / 2 + (X - cam.x + cam.y) * T / 2, H / 2 + (X - cam.x - cam.y) * T / 4]; };
-const SH_L = 'rgba(126,88,30,0.13)', SH_R = 'rgba(100,66,20,0.36)';
-
-function path(pts) {
-  ctx.beginPath();
-  ctx.moveTo(pts[0][0], pts[0][1]);
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
-  ctx.closePath();
-}
-function fillPoly(pts, fill) { path(pts); ctx.fillStyle = fill; ctx.fill(); }
-/* Fill a screen-space polygon with a texture lying on plane m. Returns false while the texture is not loaded. */
-function texPoly(pts, name, m, alpha = 1, mul = 1, ox = 0, oy = 0) {
-  const lv = texLevel(name); if (!lv) return false;
-  const s = TEX[name].units * mul / lv.px;
-  lv.pat.setTransform(new DOMMatrix([m[0] * s, m[1] * s, m[2] * s, m[3] * s, m[4] + ox * m[0] + oy * m[2], m[5] + ox * m[1] + oy * m[3]]));
-  path(pts); ctx.globalAlpha = alpha; ctx.fillStyle = lv.pat; ctx.fill(); ctx.globalAlpha = 1;
-  return true;
-}
-function line(a, b) { ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
-const inkW = () => clamp(cam.T / 26, 0.6, 1.5);
-
-/* A box in world units. stroke: 0 none, 1 thin, 2 full ink. tex / texTop: painted texture for the walls / the top. */
-function box(x, y, z, w, d, h, col, stroke = 2, tex, texTop) {
-  const A = P(x, y, z + h), B = P(x + w, y, z + h), Cc = P(x + w, y + d, z + h), D = P(x, y + d, z + h);
-  const B0 = P(x + w, y, z), C0 = P(x + w, y + d, z), D0 = P(x, y + d, z);
-  if (B[0] < -4 || D[0] > W + 4 || C0[1] < -4 || A[1] > H + 4) return;
-  const top = [A, B, Cc, D], left = [D, Cc, C0, D0], right = [B, Cc, C0, B0];
-  if (tex && texLevel(tex) && texLevel(texTop || tex)) {
-    texPoly(top, texTop || tex, matGround(z + h));
-    texPoly(left, tex, matFaceY(y + d)); fillPoly(left, SH_L);
-    texPoly(right, tex, matFaceX(x + w)); fillPoly(right, SH_R);
-  } else {
-    fillPoly(top, col.t); fillPoly(left, col.l); fillPoly(right, col.r);
-  }
-  if (!stroke) return;
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = INK;
-  ctx.globalAlpha = stroke === 2 ? 0.6 : 0.3;
-  ctx.lineWidth = stroke === 2 ? inkW() : inkW() * 0.7;
-  ctx.beginPath();
-  ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.lineTo(B0[0], B0[1]); ctx.lineTo(C0[0], C0[1]);
-  ctx.lineTo(D0[0], D0[1]); ctx.lineTo(D[0], D[1]); ctx.closePath();
-  ctx.moveTo(D[0], D[1]); ctx.lineTo(Cc[0], Cc[1]); ctx.lineTo(B[0], B[1]);
-  ctx.moveTo(Cc[0], Cc[1]); ctx.lineTo(C0[0], C0[1]);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-}
-
-/* ============================================================
-   BLOCK STRUCTURES (mastaba, pyramid): courses of blocks, each
-   course one block shorter per side and inset by half a block.
-   ============================================================ */
-function mkStruct(ox, oy, a, b, n) {
-  const courses = []; let cum = 0;
-  for (let k = 0; k < n; k++) {
-    const c = { k, a: a - k, b: b - k, x0: ox + k / 2, y0: oy + k / 2, z: k * BH, start: cum };
-    c.cap = c.a * c.b; cum += c.cap; courses.push(c);
-  }
-  return { ox, oy, a, b, n, courses, total: cum };
-}
-function courseOf(st, m) {            // index of the course that block number m belongs to (n when finished)
-  for (const c of st.courses) if (m < c.start + c.cap) return c.k;
-  return st.n;
-}
-function locate(st, m) {
-  const c = st.courses[Math.min(courseOf(st, m), st.n - 1)];
-  const r = m - c.start, i = Math.floor(r / c.b), j = r % c.b;
-  return { k: c.k, i, j, x: c.x0 + i + 0.5, y: c.y0 + j + 0.5, z: c.z };
-}
-
-const MASTABA = mkStruct(0, 0, 12, 8, 4);          // 96 + 77 + 60 + 45 = 278 blocks
-const GN = 600;                                     // side of the Great Pyramid in blocks: 72 180 100 blocks
-const GREAT = mkStruct(-68 - GN, 22 - GN, GN, GN, GN);
-
-function drawGhost(st, strong) {
-  const n = st.n, top = st.courses[n - 1], zt = n * BH;
-  const x0 = st.ox, y0 = st.oy, x1 = x0 + st.a, y1 = y0 + st.b;
-  const tx0 = top.x0, ty0 = top.y0, tx1 = tx0 + top.a, ty1 = ty0 + top.b;
-  const b00 = P(x0, y0), b10 = P(x1, y0), b11 = P(x1, y1), b01 = P(x0, y1);
-  const t00 = P(tx0, ty0, zt), t10 = P(tx1, ty0, zt), t11 = P(tx1, ty1, zt), t01 = P(tx0, ty1, zt);
-  if (b10[0] < 0 || b01[0] > W || b11[1] < 0 || t00[1] > H) return;
-  fillPoly([b01, b11, t11, t01], strong ? 'rgba(255,247,222,0.30)' : 'rgba(255,247,222,0.22)');
-  fillPoly([b10, b11, t11, t10], strong ? 'rgba(150,108,52,0.16)' : 'rgba(150,108,52,0.12)');
-  fillPoly([t00, t10, t11, t01], 'rgba(255,250,232,0.30)');
-  ctx.strokeStyle = INK; ctx.lineWidth = strong ? clamp(cam.T / 5, 1, 2) : inkW();
-  ctx.setLineDash(strong ? [10, 7] : [5, 4]);
-  ctx.globalAlpha = 0.6;
-  ctx.beginPath();
-  ctx.moveTo(b01[0], b01[1]); ctx.lineTo(b11[0], b11[1]); ctx.lineTo(b10[0], b10[1]);
-  ctx.lineTo(t10[0], t10[1]); ctx.lineTo(t00[0], t00[1]); ctx.lineTo(t01[0], t01[1]); ctx.closePath();
-  ctx.moveTo(b11[0], b11[1]); ctx.lineTo(t11[0], t11[1]);
-  ctx.moveTo(t01[0], t01[1]); ctx.lineTo(t11[0], t11[1]); ctx.lineTo(t10[0], t10[1]);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  if (strong) {                                    // faint course lines every 10 courses, to read the height
-    ctx.globalAlpha = 0.16; ctx.lineWidth = 1;
-    for (let k = Math.round(n / 20); k < n; k += Math.round(n / 20)) {
-      const c = st.courses[k];
-      line(P(c.x0, c.y0 + c.b, c.z), P(c.x0 + c.a, c.y0 + c.b, c.z));
-      line(P(c.x0 + c.a, c.y0, c.z), P(c.x0 + c.a, c.y0 + c.b, c.z));
-    }
-  }
-  ctx.globalAlpha = 1;
-}
-
-/* One slab of placed blocks inside a course: columns [i0, i0+w), rows [0, d). */
-const TONES = []; for (let i = -8; i <= 8; i++) TONES.push(i === 0 ? null : i > 0 ? `rgba(255,255,255,${(i * 0.035).toFixed(3)})` : `rgba(120,84,30,${(-i * 0.03).toFixed(3)})`);
-function slab(st, c, i0, w, d, lod, topOpen, flashIdx, flashT) {
-  const x = c.x0 + i0, y = c.y0, z = c.z, h = BH, col = C.stone;
-  if (lod < 2) { box(x, y, z, w, d, h, col, lod === 1 ? 1 : 0, 'stone'); return; }
-  const A = P(x, y, z + h), B = P(x + w, y, z + h), Cc = P(x + w, y + d, z + h), D = P(x, y + d, z + h);
-  const B0 = P(x + w, y, z), C0 = P(x + w, y + d, z), D0 = P(x, y + d, z);
-  if (B[0] < -4 || D[0] > W + 4 || C0[1] < -4 || A[1] > H + 4) return;
-  const top = [A, B, Cc, D], left = [D, Cc, C0, D0], right = [B, Cc, C0, B0];
-  if (texLevel('stone')) {
-    texPoly(top, 'stone', matGround(z + h));
-    texPoly(left, 'stone', matFaceY(y + d)); fillPoly(left, SH_L);
-    texPoly(right, 'stone', matFaceX(x + w)); fillPoly(right, SH_R);
-  } else { fillPoly(top, col.t); fillPoly(left, col.l); fillPoly(right, col.r); }
-  // every block gets its own slight tone and its joints
-  const vt = visBox(z + h), vb = visBox(z);
-  ctx.lineWidth = clamp(cam.T / 40, 0.5, 1); ctx.strokeStyle = 'rgba(74,46,22,0.3)'; ctx.lineJoin = 'round';
-  const cell = (pts, i, j, extra) => {
-    path(pts);
-    const f = extra || TONES[Math.round((hsh(c.k * 7919 + i, j, 3) - 0.5) * 16) + 8];
-    if (f) { ctx.fillStyle = f; ctx.fill(); }
-    ctx.stroke();
-  };
-  if (topOpen) {
-    const ia = Math.max(0, Math.floor(vt.x0 - x)), ib = Math.min(w, Math.ceil(vt.x1 - x));
-    const ja = Math.max(0, Math.floor(vt.y0 - y)), jb = Math.min(d, Math.ceil(vt.y1 - y));
-    for (let i = ia; i < ib; i++) for (let j = ja; j < jb; j++) {
-      const m = c.start + (i0 + i) * c.b + j;
-      cell([P(x + i, y + j, z + h), P(x + i + 1, y + j, z + h), P(x + i + 1, y + j + 1, z + h), P(x + i, y + j + 1, z + h)], i0 + i, j,
-        m === flashIdx && flashT > 0.02 ? `rgba(255,255,255,${(0.75 * flashT).toFixed(2)})` : null);
-    }
-  }
-  {
-    const ia = Math.max(0, Math.floor(vb.x0 - x)), ib = Math.min(w, Math.ceil(vt.x1 - x));
-    for (let i = ia; i < ib; i++)
-      cell([P(x + i, y + d, z + h), P(x + i + 1, y + d, z + h), P(x + i + 1, y + d, z), P(x + i, y + d, z)], i0 + i, d - 1);
-  }
-  {
-    const ja = Math.max(0, Math.floor(vb.y0 - y)), jb = Math.min(d, Math.ceil(vt.y1 - y));
-    for (let j = ja; j < jb; j++)
-      cell([P(x + w, y + j, z + h), P(x + w, y + j + 1, z + h), P(x + w, y + j + 1, z), P(x + w, y + j, z)], i0 + w - 1, j);
-  }
-  ctx.strokeStyle = INK; ctx.globalAlpha = 0.6; ctx.lineWidth = inkW();
-  ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.lineTo(B0[0], B0[1]); ctx.lineTo(C0[0], C0[1]);
-  ctx.lineTo(D0[0], D0[1]); ctx.lineTo(D[0], D[1]); ctx.closePath(); ctx.stroke();
-  ctx.globalAlpha = 1;
-}
-function drawStruct(st, placed, flashIdx, flashT) {
-  const cur = courseOf(st, placed);
-  const pxH = BH * ZK * cam.T;
-  const lod = cam.T >= 13 ? 2 : pxH >= 3 ? 1 : 0;
-  for (const c of st.courses) {
-    if (placed <= c.start) break;
-    const pk = Math.min(c.cap, placed - c.start);
-    const I = Math.floor(pk / c.b), J = pk % c.b;
-    const topOpen = c.k >= cur - 1;
-    if (I > 0) slab(st, c, 0, I, c.b, lod, topOpen, flashIdx, flashT);
-    if (J > 0) slab(st, c, I, 1, J, lod, topOpen, flashIdx, flashT);
-  }
-}
-
-/* ============================================================
-   SIMULATION (fixed crew for this study, no player input yet)
-   quarry -> pile A -> sledges -> pile B -> masons -> pile C -> ramp -> wall
-   ============================================================ */
-const PILE_CAP = 18;
-const RAMP = { y0: 2.6, y1: 5.4, slope: 8 };
-const S = {
-  placed: 120, inFlight: 0, pileA: 9, pileB: 7, pileC: 8, qT: 0, rampZ: BH,
-  speed: 1, time: 0, depart: { haul: -99, place: -99 }, flashIdx: -1, flashT: 0, stamps: [], rate: 1 / 7.5, done: false
-};
-const workCourse = () => Math.min(courseOf(MASTABA, S.placed), MASTABA.n - 1);
-const rampEdge = () => 12 - Math.max(0, workCourse() - 1) / 2;
-
-function surfaceZ(x, y) {
-  const zt = S.rampZ, kc = workCourse();
-  if (zt > 0.001) {
-    const L = zt * RAMP.slope;
-    if (y >= RAMP.y0 - 0.01 && y <= RAMP.y1 + 0.01 && x >= rampEdge() - 0.05 && x <= 12 + L)
-      return x <= 12 ? zt : zt * (1 - (x - 12) / L);
-  }
-  if (kc >= 1) {
-    const c = MASTABA.courses[kc - 1];
-    if (x >= c.x0 && x <= c.x0 + c.a && y >= c.y0 && y <= c.y0 + c.b) return kc * BH;
-  }
-  return 0;
-}
-
-const ROAD_AB = [[33.6, -35.2], [32.4, -26], [35, -18], [35.6, -13.4]];
-function mkTeam(kind, lane) {
-  const t = { kind, lane, state: 'wait', path: null, seg: 0, x: 0, y: 0, dir: [1, 0], loaded: false, t: 0, target: null, ph: lane * 1.7 };
-  if (kind === 'haul') { t.x = ROAD_AB[0][0] + lane * 1.5; t.y = ROAD_AB[0][1]; t.dir = [0, -1]; }
-  else { t.x = 33.2 + lane * 1.7; t.y = 2.4; t.dir = [0, -1]; }
-  t.hx = t.x; t.hy = t.y;
-  return t;
-}
-const teams = [mkTeam('haul', -1), mkTeam('haul', 0), mkTeam('haul', 1), mkTeam('place', -1), mkTeam('place', 0), mkTeam('place', 1)];
-const masons = [{ x: 33.4, y: -6.2, t: 0, has: true }, { x: 36.0, y: -6.2, t: 6, has: true }, { x: 38.6, y: -6.2, t: 11, has: true }];
-const T_QUARRY = 3.0, T_MASON = 14;
-
-function follow(tm, dist) {            // returns true when the path end is reached
-  while (dist > 0 && tm.seg < tm.path.length - 1) {
-    const b = tm.path[tm.seg + 1];
-    const dx = b[0] - tm.x, dy = b[1] - tm.y, d = Math.hypot(dx, dy);
-    if (d > 1e-6) tm.dir = [dx / d, dy / d];
-    if (d <= dist) { tm.x = b[0]; tm.y = b[1]; tm.seg++; dist -= d; }
-    else { tm.x += dx / d * dist; tm.y += dy / d * dist; dist = 0; }
-  }
-  return tm.seg >= tm.path.length - 1;
-}
-function go(tm, pts, state) { tm.path = [[tm.x, tm.y], ...pts]; tm.seg = 0; tm.state = state; }
-
-function stepTeam(tm, dt) {
-  tm.ph += dt * (tm.state === 'go' ? 7 : tm.state === 'back' ? 9 : 0);
-  if (tm.kind === 'haul') {
-    if (tm.state === 'wait') {
-      if (S.pileA > 0 && S.time - S.depart.haul > 3.4) { S.depart.haul = S.time; S.pileA--; tm.loaded = true; go(tm, ROAD_AB.slice(1).map(p => [p[0] + tm.lane * 1.5, p[1]]), 'go'); }
-    } else if (tm.state === 'go') {
-      if (follow(tm, dt * 2.3)) { tm.state = 'unload'; tm.t = 0; }
-    } else if (tm.state === 'unload') {
-      tm.t += dt;
-      if (tm.t > 0.7 && S.pileB < PILE_CAP) { S.pileB++; tm.loaded = false; go(tm, ROAD_AB.slice(0, -1).reverse().map(p => [p[0] + tm.lane * 1.5, p[1]]), 'back'); }
-    } else if (tm.state === 'back') {
-      if (follow(tm, dt * 3.6)) tm.state = 'wait';
-    }
-    return;
-  }
-  // placing team
-  if (tm.state === 'wait') {
-    const idx = S.placed + S.inFlight;
-    if (S.pileC > 0 && idx < MASTABA.total && S.time - S.depart.place > 3.8) {
-      const tg = locate(MASTABA, idx), kc = workCourse();
-      if (tg.k === kc && Math.abs(S.rampZ - kc * BH) < 0.02) {
-        S.depart.place = S.time; S.pileC--; S.inFlight++; tm.loaded = true; tm.target = tg; tm.idx = idx;
-        const ym = (RAMP.y0 + RAMP.y1) / 2 + tm.lane * 0.25;
-        const L = S.rampZ * RAMP.slope;
-        const sx = Math.min(tg.x + 3.3, 12.4);
-        const sy = sx >= 12.3 ? ym : lerp(tg.y, ym, 0.25);
-        tm.rampPath = [[29, 3.6 + tm.lane * 0.6], [12 + L + 1.4, ym], [12.4, ym]];
-        const pts = tm.rampPath.slice(); if (sx < 12.3) pts.push([sx, sy]);
-        go(tm, pts, 'go');
-      }
-    }
-  } else if (tm.state === 'go') {
-    if (follow(tm, dt * 2.0)) { tm.state = 'place'; tm.t = 0; tm.from = [tm.x, tm.y]; }
-  } else if (tm.state === 'place') {
-    tm.t += dt;
-    if (tm.t >= 1.5) {
-      S.placed++; S.inFlight--; tm.loaded = false;
-      S.flashIdx = S.placed - 1; S.flashT = 1;
-      S.stamps.push(S.time); if (S.stamps.length > 12) S.stamps.shift();
-      if (S.stamps.length >= 4) S.rate = (S.stamps.length - 1) / (S.stamps[S.stamps.length - 1] - S.stamps[0]);
-      const back = tm.rampPath.slice().reverse(); back.push([tm.hx, tm.hy]);
-      go(tm, back, 'back');
-    }
-  } else if (tm.state === 'back') {
-    if (follow(tm, dt * 3.4)) tm.state = 'wait';
-  }
-}
-
-function step(dt) {
-  S.time += dt;
-  if (S.pileA < PILE_CAP) { S.qT += dt; if (S.qT >= T_QUARRY) { S.qT = 0; S.pileA++; } }
-  for (const m of masons) {
-    if (!m.has && S.pileB > 0) { S.pileB--; m.has = true; m.t = 0; }
-    if (m.has) { m.t += dt; if (m.t >= T_MASON && S.pileC < PILE_CAP) { S.pileC++; m.has = false; } }
-  }
-  const target = workCourse() * BH;
-  if (S.inFlight === 0 || S.rampZ < target) S.rampZ = Math.min(target, S.rampZ + dt * 0.22);
-  for (const tm of teams) stepTeam(tm, dt);
-  S.flashT = Math.max(0, S.flashT - dt * 1.6);
-  if (!S.done && S.placed >= MASTABA.total) { S.done = true; onDone(); }
-}
-
-/* ============================================================
-   FIGURES AND PROPS (all sized from world units through cam.T)
-   ============================================================ */
-function worker(x, y, z, o) {
-  const [sx, sy] = P(x, y, z);
-  const Hh = HUMAN * ZK * cam.T;
-  if (cam.T < 2.2 || sx < -30 || sx > W + 30 || sy < -10 || sy > H + Hh + 10) return;
-  if (cam.T < 7) {
-    ctx.fillStyle = C.skin; ctx.fillRect(sx - Hh * 0.13, sy - Hh, Hh * 0.26, Hh * 0.5);
-    ctx.fillStyle = C.kilt; ctx.fillRect(sx - Hh * 0.16, sy - Hh * 0.55, Hh * 0.32, Hh * 0.32);
-    return;
-  }
-  const a = o.anim, ph = o.ph || 0;
-  ctx.save(); ctx.translate(sx, sy); ctx.scale(o.face || 1, 1);
-  ctx.fillStyle = C.shadow; ctx.beginPath(); ctx.ellipse(Hh * 0.16, 0, Hh * 0.3, Hh * 0.085, 0, 0, 7); ctx.fill();
-  const moving = a === 'walk' || a === 'pull';
-  const sw = moving ? Math.sin(ph) * 0.15 * Hh : 0;
-  const lean = a === 'pull' ? 0.5 : a === 'chip' ? 0.16 : a === 'carve' ? 0.42 : 0;
-  const hip = -0.3 * Hh, ol = clamp(Hh * 0.035, 0.6, 1.3);
-  ctx.lineCap = 'round'; ctx.strokeStyle = C.skinD; ctx.lineWidth = Hh * 0.11;
-  ctx.beginPath();
-  ctx.moveTo(-0.06 * Hh, hip); ctx.lineTo(-0.07 * Hh - sw - (a === 'pull' ? 0.12 * Hh : 0), -0.02 * Hh);
-  ctx.moveTo(0.06 * Hh, hip); ctx.lineTo(0.07 * Hh + sw, -0.02 * Hh);
-  ctx.stroke();
-  ctx.translate(0, hip); ctx.rotate(lean);
-  // torso
-  ctx.fillStyle = C.skin; ctx.strokeStyle = INK; ctx.lineWidth = ol;
-  ctx.beginPath(); ctx.roundRect(-0.13 * Hh, -0.46 * Hh, 0.26 * Hh, 0.36 * Hh, 0.07 * Hh); ctx.fill(); ctx.stroke();
-  // kilt
-  path([[-0.14 * Hh, -0.17 * Hh], [0.14 * Hh, -0.17 * Hh], [0.18 * Hh, 0.07 * Hh], [-0.18 * Hh, 0.07 * Hh]]);
-  ctx.fillStyle = C.kilt; ctx.fill(); ctx.stroke();
-  // arm (+ tool)
-  let ax, ay;
-  if (a === 'pull') { ax = 0.3 * Hh; ay = -0.2 * Hh; }
-  else if (a === 'chip') { const sn = Math.sin(ph); ax = (0.27 + 0.06 * sn) * Hh; ay = (-0.5 + 0.22 * sn) * Hh; }
-  else if (a === 'carve') { const sn = Math.sin(ph * 1.6); ax = 0.28 * Hh; ay = (-0.1 + 0.05 * sn) * Hh; }
-  else if (a === 'walk') { ax = Math.sin(ph + Math.PI) * 0.13 * Hh + 0.04 * Hh; ay = -0.12 * Hh; }
-  else { ax = 0.13 * Hh; ay = -0.12 * Hh; }
-  ctx.strokeStyle = C.skinD; ctx.lineWidth = Hh * 0.09;
-  ctx.beginPath(); ctx.moveTo(0.05 * Hh, -0.38 * Hh); ctx.lineTo(ax, ay); ctx.stroke();
-  if (a === 'chip' || a === 'carve') {
-    ctx.strokeStyle = C.wood.r; ctx.lineWidth = Hh * 0.06;
-    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax + 0.2 * Hh, ay + (a === 'chip' ? -0.12 : 0.1) * Hh); ctx.stroke();
-  }
-  // head
-  ctx.fillStyle = C.skin; ctx.strokeStyle = INK; ctx.lineWidth = ol;
-  ctx.beginPath(); ctx.arc(0.03 * Hh, -0.58 * Hh, 0.13 * Hh, 0, 7); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = C.hair;
-  ctx.beginPath(); ctx.arc(0.03 * Hh, -0.58 * Hh, 0.135 * Hh, Math.PI * 0.92, Math.PI * 2.02); ctx.lineTo(-0.09 * Hh, -0.5 * Hh); ctx.closePath(); ctx.fill();
-  ctx.restore();
-}
-const faceOf = d => (d[0] - d[1]) >= 0 ? 1 : -1;
-
-function pileBlocks(px, py, n, col, tex) {
-  for (let m = 0; m < n; m++) {
-    const L = Math.floor(m / 9), r = m % 9, i = Math.floor(r / 3), j = r % 3;
-    box(px + i * 1.1, py + j * 1.1, L * BH, 1, 1, BH, col, cam.T >= 9 ? 2 : cam.T >= 5 ? 1 : 0, tex);
-  }
-}
-function groundShadow(x0, y0, x1, y1, h, tx0, ty0, tx1, ty1) {   // light travels toward (+0.8,-0.35) per unit height
-  const ox = 0.8 * h, oy = -0.35 * h;
-  const pts = [P(x0, y1), P(x1, y1), P((tx1 ?? x1) + ox, (ty1 ?? y1) + oy), P((tx1 ?? x1) + ox, (ty0 ?? y0) + oy), P((tx0 ?? x0) + ox, (ty0 ?? y0) + oy), P(x0, y0)];
-  fillPoly(pts, C.shadow);
-}
-
-function spriteAt(m, sx, sy, s) {
-  const x = sx - m.ax * s, y = sy - m.ay * s;
-  if (x > W || y > H || x + m.w * s < 0 || y + m.h * s < 0) return;
-  ctx.drawImage(m.img, x, y, m.w * s, m.h * s);
-}
-function house(o) {
-  const m = SPR[o.kind];
-  if (m && m.ok) { const f = P(o.x + o.w, o.y + o.d); spriteAt(m, f[0], f[1], (o.w + o.d) / 2 * cam.T / m.w); return; }
-  const st = cam.T >= 9 ? 2 : cam.T >= 4 ? 1 : 0;
-  box(o.x, o.y, 0, o.w, o.d, o.h, C.mud, st);
-  if (cam.T < 9) return;
-  // roof parapet
-  fillPoly([P(o.x + 0.3, o.y + 0.3, o.h), P(o.x + o.w - 0.3, o.y + 0.3, o.h), P(o.x + o.w - 0.3, o.y + o.d - 0.3, o.h), P(o.x + 0.3, o.y + o.d - 0.3, o.h)], shade(C.mud.t, -0.1));
-  // door on the left face, window on the right
-  const dx = o.x + o.w * 0.3;
-  fillPoly([P(dx, o.y + o.d, 1.6), P(dx + 0.8, o.y + o.d, 1.6), P(dx + 0.8, o.y + o.d, 0), P(dx, o.y + o.d, 0)], '#5A3B22');
-  const wy = o.y + o.d * 0.4;
-  fillPoly([P(o.x + o.w, wy, o.h * 0.75), P(o.x + o.w, wy + 0.6, o.h * 0.75), P(o.x + o.w, wy + 0.6, o.h * 0.5), P(o.x + o.w, wy, o.h * 0.5)], '#5A3B22');
-}
-function palm(o) {
-  const m = SPR[o.kind];
-  if (m && m.ok) { const f = P(o.x, o.y), s = o.h * ZK * cam.T / m.h; if (m.h * s >= 3) spriteAt(m, f[0], f[1], s); return; }
-  const [sx, sy] = P(o.x, o.y, 0), hp = o.h * ZK * cam.T;
-  if (sx < -60 || sx > W + 60 || sy < -10 || sy - hp > H + 40) return;
-  if (cam.T < 3.2) { ctx.fillStyle = C.palmD; ctx.beginPath(); ctx.arc(sx, sy - hp, Math.max(1.2, cam.T * 0.9), 0, 7); ctx.fill(); return; }
-  const lw = clamp(cam.T * 0.2, 0.8, 9), bend = o.lean * cam.T * 1.3;
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = C.trunk; ctx.lineWidth = lw;
-  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo(sx + bend * 0.2, sy - hp * 0.6, sx + bend, sy - hp); ctx.stroke();
-  const tx = sx + bend, ty = sy - hp, R = cam.T * 2.4;
-  for (let i = 0; i < 7; i++) {
-    const a = -Math.PI * 0.5 + (i - 3) * 0.52 + o.lean * 0.3;
-    const ex = tx + Math.cos(a) * R, ey = ty + Math.sin(a) * R * 0.55 + R * 0.5 * Math.abs(i - 3) / 3;
-    ctx.strokeStyle = i % 2 ? C.palm : C.palmD; ctx.lineWidth = clamp(cam.T * 0.34, 1, 13);
-    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.quadraticCurveTo(tx + Math.cos(a) * R * 0.6, ty + Math.sin(a) * R * 0.8 - R * 0.15, ex, ey); ctx.stroke();
-  }
-}
-function canopy(o) {
-  const z = 2.5;
-  ctx.strokeStyle = C.wood.r; ctx.lineWidth = clamp(cam.T * 0.12, 0.8, 4); ctx.lineCap = 'round';
-  for (const [px, py] of [[o.x, o.y], [o.x + o.w, o.y], [o.x, o.y + o.d], [o.x + o.w, o.y + o.d]]) line(P(px, py, 0), P(px, py, z));
-  const pts = [P(o.x - 0.3, o.y - 0.3, z), P(o.x + o.w + 0.3, o.y - 0.3, z), P(o.x + o.w + 0.3, o.y + o.d + 0.3, z), P(o.x - 0.3, o.y + o.d + 0.3, z)];
-  fillPoly(pts, '#EFE2B4');
-  if (cam.T >= 9) {
-    ctx.strokeStyle = '#C9A24C'; ctx.lineWidth = clamp(cam.T * 0.09, 0.6, 3);
-    for (let i = 0.6; i < o.w; i += 1.1) line(P(o.x + i, o.y - 0.3, z), P(o.x + i, o.y + o.d + 0.3, z));
-  }
-  ctx.strokeStyle = INK; ctx.globalAlpha = 0.8; ctx.lineWidth = inkW(); path(pts); ctx.stroke(); ctx.globalAlpha = 1;
-}
-function rockBench(o) {
-  const painted = !!texLevel('strata');
-  box(o.x, o.y, 0, o.w, o.d, o.h, C.rock, cam.T >= 4 ? 2 : 0, 'strata', 'sand');
-  if (painted) fillPoly([P(o.x, o.y, o.h), P(o.x + o.w, o.y, o.h), P(o.x + o.w, o.y + o.d, o.h), P(o.x, o.y + o.d, o.h)], 'rgba(150,108,46,0.13)');
-  if (cam.T < 8) return;
-  if (!o.cuts) for (let i = 0; i < o.w * o.d / 9; i++) {
-    const x = o.x + 0.6 + hsh(i, o.w, 71) * (o.w - 1.2), y = o.y + 0.6 + hsh(i, o.d, 72) * (o.d - 1.2), [sx, sy] = P(x, y, o.h), u = cam.T;
-    ctx.fillStyle = hsh(i, 5, 73) > 0.5 ? 'rgba(247,232,188,0.8)' : 'rgba(190,156,96,0.7)';
-    ctx.beginPath(); ctx.ellipse(sx, sy, u * (0.25 + hsh(i, 6, 74) * 0.5), u * 0.11, 0, 0, 7); ctx.fill();
-  }
-  ctx.strokeStyle = 'rgba(122,96,54,0.45)'; ctx.lineWidth = clamp(cam.T / 36, 0.5, 1);
-  if (!painted) for (let z = 0.7; z < o.h - 0.1; z += 0.72) {                    // bedding planes of the limestone
-    line(P(o.x, o.y + o.d, z), P(o.x + o.w, o.y + o.d, z));
-    line(P(o.x + o.w, o.y, z), P(o.x + o.w, o.y + o.d, z));
-  }
-  if (o.cuts && cam.T >= 12) {                                      // trenches cut around the next blocks
-    ctx.strokeStyle = 'rgba(122,96,54,0.55)';
-    for (let x = o.x + 1; x < o.x + o.w; x += 1.1) line(P(x, o.y + o.d - 2.2, o.h), P(x, o.y + o.d, o.h));
-    for (let y = o.y + o.d - 2.2; y < o.y + o.d; y += 1.1) line(P(o.x, y, o.h), P(o.x + o.w, y, o.h));
-  }
-}
-function drawRamp() {
-  const zt = S.rampZ; if (zt < 0.01) return;
-  const e = rampEdge(), L = zt * RAMP.slope, x2 = 12 + L, y0 = RAMP.y0, y1 = RAMP.y1;
-  const fL = [P(e, y1, zt), P(12, y1, zt), P(x2, y1, 0), P(e, y1, 0)], fT = [P(e, y0, zt), P(12, y0, zt), P(12, y1, zt), P(e, y1, zt)], fS = [P(12, y0, zt), P(x2, y0, 0), P(x2, y1, 0), P(12, y1, zt)];
-  if (texLevel('earth')) {
-    texPoly(fL, 'earth', matFaceY(y1)); fillPoly(fL, SH_R);
-    texPoly(fT, 'earth', matGround(zt));
-    texPoly(fS, 'earth', matGround(zt / 2)); fillPoly(fS, 'rgba(100,66,20,0.10)');
-  } else { fillPoly(fL, C.ramp.l); fillPoly(fT, C.ramp.t); fillPoly(fS, shade(C.ramp.t, -0.06)); }
-  if (cam.T >= 10) {                                                // timber sleepers across the track
-    ctx.strokeStyle = C.wood.l; ctx.lineWidth = clamp(cam.T * 0.07, 0.8, 3);
-    for (let x = 12.6; x < x2 - 0.3; x += 1.2) { const z = zt * (1 - (x - 12) / L); line(P(x, y0 + 0.25, z), P(x, y1 - 0.25, z)); }
-    ctx.strokeStyle = 'rgba(74,46,22,0.3)'; ctx.lineWidth = clamp(cam.T / 40, 0.5, 1);
-    for (let z = 0.32; z < zt; z += 0.32) line(P(e, y1, z), P(12 + L * (1 - z / zt), y1, z));
-  }
-  ctx.strokeStyle = INK; ctx.globalAlpha = 0.6; ctx.lineWidth = inkW(); ctx.lineJoin = 'round';
-  ctx.beginPath();
-  const pts = [P(e, y1, zt), P(e, y0, zt), P(12, y0, zt), P(x2, y0, 0), P(x2, y1, 0), P(e, y1, 0)];
-  ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath();
-  const a = P(12, y1, zt); ctx.moveTo(pts[0][0], pts[0][1]); ctx.lineTo(a[0], a[1]); ctx.lineTo(pts[4][0], pts[4][1]);
-  ctx.stroke(); ctx.globalAlpha = 1;
-}
-
-/* ============================================================
-   STATIC OBJECTS, sorted once by "who stands in front of whom"
-   ============================================================ */
-const statics = [];
-const add = (o) => { statics.push(o); return o; };
-const sGreat = add({ x0: GREAT.ox, y0: GREAT.oy, x1: GREAT.ox + GN, y1: GREAT.oy + GN, draw() { drawGhost(GREAT, true); drawStruct(GREAT, 0, -1, 0); } });
-const benches = [
-  { x: 12, y: -62, w: 32, d: 8, h: 7 }, { x: 12, y: -54, w: 7, d: 9, h: 5.2 }, { x: 19, y: -54, w: 25, d: 5, h: 3.9 },
-  { x: 19, y: -49, w: 20, d: 4, h: 2.6 }, { x: 19, y: -45, w: 17, d: 3.4, h: 1.3, cuts: true }, { x: 39, y: -49, w: 5, d: 3, h: 1.9 }
-];
-for (const b of benches) add({ x0: b.x, y0: b.y, x1: b.x + b.w, y1: b.y + b.d, h: b.h, shadow: true, draw() { rockBench(b); } });
-add({ x0: 32, y0: -39.6, x1: 35.3, y1: -36.3, draw() { pileBlocks(32, -39.6, S.pileA, C.raw, 'strata'); } });
-add({ x0: 34, y0: -12, x1: 37.3, y1: -8.7, draw() { pileBlocks(34, -12, S.pileB, C.raw, 'strata'); } });
-add({ x0: 34, y0: -3.6, x1: 37.3, y1: -0.3, draw() { pileBlocks(34, -3.6, S.pileC, C.stone, 'stone'); } });
-const sMast = add({ x0: 0, y0: 0, x1: 12, y1: 8, draw() { drawGhost(MASTABA, false); drawStruct(MASTABA, S.placed, S.flashIdx, S.flashT); } });
-const sRamp = add({ x0: 10.5, y0: RAMP.y0, x1: 12 + 3 * BH * RAMP.slope, y1: RAMP.y1, after: [sMast], draw() { drawRamp(); } });
-const cano = { x: 41.5, y: -9.6, w: 5.4, d: 5.4, kind: 'workshop' };
-add({ x0: cano.x, y0: cano.y, x1: cano.x + cano.w, y1: cano.y + cano.d, h: 2.6, shadow: true, draw() { if (SPR.workshop.ok) house(cano); else canopy(cano); } });
-const HOUSE_KINDS = { hut: { w: 3.4, d: 6.2, h: 2.4 }, house_a: { w: 5, d: 5, h: 3 }, house_b: { w: 7.2, d: 7, h: 3.6 }, granary: { w: 6.6, d: 6.45, h: 3.6 } };
-function addHouse(kind, x, y) {
-  const k = HOUSE_KINDS[kind], o = { kind, x, y, w: k.w, d: k.d, h: k.h };
-  add({ x0: x, y0: y, x1: x + k.w, y1: y + k.d, h: k.h, shadow: true, draw() { house(o); } });
-}
-addHouse('granary', 40.5, 8.5);
-for (let r = 0; r < 8; r++) for (let c = 0; c < 3; c++) {           // workers' village of mud brick
-  const k = hsh(r, c, 11); if (k < 0.2) continue;
-  const kind = k < 0.55 ? 'hut' : (k < 0.88 || c === 2) ? 'house_a' : 'house_b';
-  addHouse(kind, [47.6, 56.3, 64.4][c] + hsh(r, c, 15) * 0.6, -30 + r * 8.8 + hsh(r, c, 16) * 1.4);
-}
-const nileL = y => 96 + 5 * Math.sin(y / 37) + 2.5 * Math.sin(y / 11 + 1);
-const nileR = y => nileL(y) + 38 + 3 * Math.sin(y / 23);
-for (let i = -128; i < 128; i++) {                                  // palms along the fields and both banks
-  const y = i * 5.5;
-  const spots = [[69.5 + hsh(i, 1, 21) * 1.5, 0.75], [79.6, 0.45], [nileL(y) - 2.2 - hsh(i, 3, 21) * 4, 0.8], [nileR(y) + 2 + hsh(i, 4, 21) * 14, 0.7]];
-  spots.forEach(([x, p], n) => {
-    if (hsh(i, n, 22) > p) return;
-    const v = hsh(i, n, 26), kind = v < 0.5 ? 'palm_a' : v < 0.82 ? 'palm_b' : 'palm_c';
-    const o = { kind, x, y: y + hsh(i, n, 23) * 4, h: (kind === 'palm_b' ? 6.4 : 8) + hsh(i, n, 24) * 2.6, lean: hsh(i, n, 25) - 0.5 };
-    add({ x0: o.x - 0.3, y0: o.y - 0.3, x1: o.x + 0.3, y1: o.y + 0.3, palm: o, draw() { palm(o); } });
-  });
-}
-for (let i = -80; i < 80; i++) {                                    // reeds at the water's edge
-  const y = i * 3.3;
-  [[nileL(y) + 0.2 - hsh(i, 1, 81) * 1.3, 0.55], [nileR(y) - 0.2 + hsh(i, 2, 81) * 1.3, 0.5]].forEach(([x, p], n) => {
-    if (hsh(i, n, 82) > p) return;
-    const o = { kind: 'reeds', x, y: y + hsh(i, n, 83) * 2.5, h: 2.6 + hsh(i, n, 84) * 1.3 };
-    add({ x0: o.x - 0.2, y0: o.y - 0.2, x1: o.x + 0.2, y1: o.y + 0.2, draw() { if (cam.T >= 5) palm(o); } });
-  });
-}
-(function sortStatics() {                                           // topological order: B before A when A stands in front of B
-  const n = statics.length, front = (A, B) => A.x0 >= B.x1 - 1e-6 || A.y0 >= B.y1 - 1e-6;
-  const out = statics.map(() => []), deg = new Array(n).fill(0);
-  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
-    if (i === j) continue;
-    const A = statics[i], B = statics[j];
-    const forced = A.after && A.after.includes(B);
-    if (forced || (front(A, B) && !front(B, A) && !(B.after && B.after.includes(A)))) { out[j].push(i); deg[i]++; }
-  }
-  const key = o => o.x0 + o.x1 + o.y0 + o.y1;
-  const ready = []; for (let i = 0; i < n; i++) if (!deg[i]) ready.push(i);
-  const order = [];
-  while (ready.length) {
-    ready.sort((a, b) => key(statics[b]) - key(statics[a]));
-    const i = ready.pop(); order.push(statics[i]);
-    for (const j of out[i]) if (--deg[j] === 0) ready.push(j);
-  }
-  if (order.length === n) { statics.length = 0; statics.push(...order); }
-})();
-
-/* ============================================================
-   GROUND
-   ============================================================ */
-function strip(pts, half) {                                         // a road as a ribbon around a polyline
-  const L = [], R = [];
-  for (let i = 0; i < pts.length; i++) {
-    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
-    const dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 1;
-    L.push(P(pts[i][0] - dy / d * half, pts[i][1] + dx / d * half));
-    R.push(P(pts[i][0] + dy / d * half, pts[i][1] - dx / d * half));
-  }
-  return L.concat(R.reverse());
-}
-const ROADS = [
-  { pts: [[33.6, -35.8], [32.6, -26], [35, -18], [35.6, -13.4], [35.6, -2]], half: 2.3 },
-  { pts: [[35.6, -1], [34.6, 2.4], [29, 3.8], [12.5, 4]], half: 1.9 },
-  { pts: [[38, 3], [46, 4], [52, 6]], half: 1.5 }
-];
-function drawGround(now) {
-  const mg = matGround(0), scr = [[0, 0], [W, 0], [W, H], [0, H]];
-  if (texPoly(scr, 'sand', mg)) texPoly(scr, 'sand', mg, 0.4, 4.7, 9, 5);
-  else { ctx.fillStyle = C.sand; ctx.fillRect(0, 0, W, H); }
-  const vb = visBox(0, 30);
-  // broad dune tones
-  const dc = cam.T >= 5 ? 46 : cam.T >= 2 ? 138 : 414, dk = dc / 46;   // fewer, broader dunes when far away
-  for (let i = Math.floor(vb.x0 / dc); i <= Math.ceil(vb.x1 / dc); i++) for (let j = Math.floor(vb.y0 / dc); j <= Math.ceil(vb.y1 / dc); j++) {
-    const x = i * dc + hsh(i, j, 31 + dk) * dc * 0.65, y = j * dc + hsh(i, j, 32) * dc * 0.65; if (x > 60) continue;
-    const r = (16 + hsh(i, j, 33) * 18) * dk * cam.T * 0.7, [sx, sy] = P(x, y);
-    if (sx + r < 0 || sx - r > W || sy + r * 0.5 < 0 || sy - r * 0.5 > H) continue;
-    const lightTone = hsh(i, j, 34) > 0.5;
-    ctx.save(); ctx.translate(sx, sy); ctx.scale(1, 0.5);
-    const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
-    gr.addColorStop(0, lightTone ? 'rgba(246,228,176,0.5)' : 'rgba(206,170,98,0.34)');
-    gr.addColorStop(1, lightTone ? 'rgba(246,228,176,0)' : 'rgba(206,170,98,0)');
-    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill(); ctx.restore();
-  }
-  // levelled bedrock where the Great Pyramid will stand
-  const g = GREAT, gp = [P(g.ox - 6, g.oy - 6), P(g.ox + g.a + 6, g.oy - 6), P(g.ox + g.a + 6, g.oy + g.b + 6), P(g.ox - 6, g.oy + g.b + 6)];
-  fillPoly(gp, 'rgba(250,236,196,0.55)');
-  ctx.strokeStyle = 'rgba(74,46,22,0.35)'; ctx.lineWidth = 1; path(gp); ctx.stroke();
-  // river plain
-  if (vb.x1 > 62) {
-    const ys = []; for (let y = Math.floor(vb.y0 / 6) * 6; y <= vb.y1 + 6; y += 6) ys.push(y);
-    const band = (fa, fb, fill, tex, a, mul, oy) => {
-      const p = ys.map(y => P(fa(y), y)).concat(ys.slice().reverse().map(y => P(fb(y), y)));
-      if (!tex || !texPoly(p, tex, mg, a, mul, 0, oy)) { if (fill) fillPoly(p, fill); return false; }
-      return true;
-    };
-    const gl = y => nileL(y) - 27 + 1.5 * Math.sin(y / 9);
-    band(y => gl(y) - 1.6, nileL, C.damp);
-    band(gl, nileL, C.green, 'grass');
-    band(nileR, y => nileR(y) + 25 + 2 * Math.sin(y / 13), C.green, 'grass');
-    // field plots
-    for (let j = Math.floor(vb.y0 / 9); j <= Math.ceil(vb.y1 / 9); j++) for (let c = 0; c < 2; c++) {
-      const x0 = c ? 80.4 : 71.4, x1 = c ? 87.4 : 78.9, y0 = j * 9, y1 = y0 + 8.1, k = hsh(j, c, 41);
-      const p = [P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1)];
-      if (p[1][0] < 0 || p[3][0] > W || p[2][1] < 0 || p[0][1] > H) continue;
-      const kind = k < 0.34 ? 'wheat' : k < 0.82 ? 'crops' : 'earth';
-      if (!texPoly(p, kind, mg)) {
-        fillPoly(p, k < 0.34 ? C.wheat : k < 0.7 ? C.greenD : '#9CCB5E');
-        if (cam.T >= 7) { ctx.strokeStyle = 'rgba(74,46,22,0.18)'; ctx.lineWidth = 1; for (let x = x0 + 0.9; x < x1; x += 0.9) line(P(x, y0), P(x, y1)); }
-      } else if (kind === 'earth') fillPoly(p, 'rgba(70,40,14,0.25)');
-      if (cam.T >= 7) { ctx.strokeStyle = 'rgba(74,46,22,0.4)'; ctx.lineWidth = inkW() * 0.8; path(p); ctx.stroke(); }
-    }
-    const painted = band(nileL, nileR, C.water, 'water', 1, 1, -((now * 0.0011) % 22));
-    if (painted) {
-      band(nileL, nileR, null, 'water', 0.3, 2.6, (now * 0.0006) % 57.2);
-      band(y => nileL(y) + 9, y => nileR(y) - 9, 'rgba(16,80,108,0.2)');
-    } else band(y => nileL(y) + 9, y => nileR(y) - 9, C.waterD);
-    ctx.strokeStyle = 'rgba(74,46,22,0.4)'; ctx.lineWidth = inkW();
-    ctx.beginPath(); ys.forEach((y, i) => { const p = P(nileL(y), y); i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); }); ctx.stroke();
-    ctx.beginPath(); ys.forEach((y, i) => { const p = P(nileR(y), y); i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); }); ctx.stroke();
-    if (!painted && cam.T >= 5) {                                   // ripples drifting north
-      ctx.strokeStyle = C.waterL; ctx.lineWidth = clamp(cam.T * 0.07, 0.8, 2.5); ctx.lineCap = 'round';
-      for (let j = Math.floor(vb.y0 / 7); j <= Math.ceil(vb.y1 / 7); j++) for (let c = 0; c < 5; c++) {
-        if (hsh(j, c, 51) > 0.55) continue;
-        const y = j * 7 + hsh(j, c, 52) * 7 - ((now * 0.0012 + hsh(j, c, 55)) % 1) * 3;
-        const x = nileL(y) + 3 + c * 7 + hsh(j, c, 53) * 4, len = 1.5 + hsh(j, c, 54) * 2;
-        line(P(x, y), P(x, y + len));
-      }
-    }
-    // river boats, drifting downstream
-    for (let b = 0; b < 3; b++) {
-      const y = ((now * 0.0016 * (1 + b * 0.35) + b * 170) % 520 + 520) % 520 - 260, x = nileL(y) + 11 + b * 8;
-      const [sx, sy] = P(x, y), u = cam.T;
-      if (u < 1.5 || sx < -200 || sx > W + 200 || sy < -200 || sy > H + 200) continue;
-      if (SPR.boat.ok) { spriteAt(SPR.boat, sx, sy, 8.5 * u / SPR.boat.w); continue; }
-      ctx.fillStyle = C.wood.l; ctx.strokeStyle = INK; ctx.lineWidth = inkW();
-      ctx.beginPath(); ctx.moveTo(sx - 2.4 * u, sy - 0.5 * u); ctx.quadraticCurveTo(sx, sy + 1.3 * u, sx + 2.4 * u, sy - 0.5 * u); ctx.closePath(); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#FBF2D8';
-      path([[sx - 1.5 * u, sy - 3.1 * u], [sx + 1.5 * u, sy - 3.1 * u], [sx + 1.2 * u, sy - 1.2 * u], [sx - 1.2 * u, sy - 1.2 * u]]); ctx.fill(); ctx.stroke();
-    }
-  }
-  // roads
-  for (const r of ROADS) { const p = strip(r.pts, r.half); if (!texPoly(p, 'earth', mg, 0.3)) fillPoly(p, 'rgba(203,170,102,0.5)'); }
-  if (cam.T >= 9) {
-    ctx.strokeStyle = C.rut; ctx.lineWidth = clamp(cam.T * 0.06, 0.8, 2.4); ctx.lineCap = 'round';
-    for (const r of ROADS.slice(0, 2)) for (const off of [-0.9, 0.9]) {
-      ctx.beginPath(); r.pts.forEach((p, i) => { const q = P(p[0] + off, p[1] + off * 0.3); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.stroke();
-    }
-  }
-  // sand ripples and stones, only when close enough to matter
-  if (cam.T >= 11) {
-    const v = visBox(0, 4); ctx.lineCap = 'round';
-    for (let i = Math.floor(v.x0 / 4); i <= Math.ceil(Math.min(v.x1, 66) / 4); i++) for (let j = Math.floor(v.y0 / 4); j <= Math.ceil(v.y1 / 4); j++) {
-      const k = hsh(i, j, 61), x = i * 4 + hsh(i, j, 62) * 3, y = j * 4 + hsh(i, j, 63) * 3;
-      if (x > -3 && x < 30 && y > -3 && y < 11) continue;
-      const [sx, sy] = P(x, y), u = cam.T;
-      if (k < 0.3) {
-        ctx.strokeStyle = k < 0.15 ? 'rgba(196,160,92,0.75)' : 'rgba(247,230,180,0.9)'; ctx.lineWidth = clamp(u * 0.05, 0.8, 2);
-        ctx.beginPath(); ctx.moveTo(sx - u * 0.7, sy); ctx.quadraticCurveTo(sx, sy - u * 0.16, sx + u * 0.7, sy); ctx.stroke();
-      } else if (k > 0.94) {
-        ctx.fillStyle = C.rock.r; ctx.beginPath(); ctx.ellipse(sx, sy, u * 0.22, u * 0.12, 0, 0, 7); ctx.fill();
-        ctx.fillStyle = C.rock.t; ctx.beginPath(); ctx.ellipse(sx - u * 0.04, sy - u * 0.05, u * 0.16, u * 0.08, 0, 0, 7); ctx.fill();
-      }
-    }
-  }
-  // shadows on the ground
-  for (const s of statics) {
-    if (s.shadow) groundShadow(s.x0, s.y0, s.x1, s.y1, s.h);
-    else if (s.palm && cam.T >= 5) {
-      const p = s.palm, [sx, sy] = P(p.x + 0.8 * p.h * 0.45, p.y - 0.35 * p.h * 0.45);
-      ctx.fillStyle = C.shadow; ctx.beginPath(); ctx.ellipse(sx, sy, cam.T * 1.7, cam.T * 0.6, 0, 0, 7); ctx.fill();
-    }
-  }
-  const cur = courseOf(MASTABA, S.placed);
-  if (S.placed > 0) {
-    const c = MASTABA.courses[Math.max(0, Math.min(cur, MASTABA.n - 1) - (cur >= MASTABA.n ? 0 : 1))] || MASTABA.courses[0];
-    const hz = (c.k + 1) * BH;
-    groundShadow(0, 0, 12, 8, hz, c.x0, c.y0, c.x0 + c.a, c.y0 + c.b);
-  }
-  if (S.rampZ > 0.01) {
-    const L = S.rampZ * RAMP.slope, ox = 0.8 * S.rampZ, oy = -0.35 * S.rampZ;
-    fillPoly([P(12, RAMP.y0), P(12 + ox, RAMP.y0 + oy), P(12 + L, RAMP.y0)], C.shadow);
-  }
-}
-
-/* ============================================================
-   MOVERS: collected every frame, slotted between the statics
-   ============================================================ */
-function collectMovers(now) {
-  const items = [];
-  const t = S.time;
-  // quarrymen: they stop when their pile is full, which is the whole point of buffers
-  const qBusy = S.pileA < PILE_CAP;
-  [[20.6, -40.9, 0], [23.6, -41, 0], [26.6, -40.9, 0], [29.4, -41, 0], [24.5, -44.4, 1.3], [31.5, -44.5, 1.3]].forEach(([x, y, z], i) =>
-    items.push({ x, y, draw() { worker(x, y, z, { face: 1, anim: qBusy ? 'chip' : 'idle', ph: t * 6 + i * 1.3 }); } }));
-  // masons with the block they are dressing
-  masons.forEach((m, i) => {
-    if (m.has) {
-      const k = clamp(m.t / T_MASON, 0, 1);
-      const col = { t: mix(C.raw.t, C.stone.t, k), l: mix(C.raw.l, C.stone.l, k), r: mix(C.raw.r, C.stone.r, k) };
-      items.push({ x: m.x, y: m.y, draw() { box(m.x - 0.5, m.y - 0.5, 0, 1, 1, BH, col, cam.T >= 9 ? 2 : 1, k < 0.55 ? 'strata' : 'stone'); } });
-    }
-    items.push({ x: m.x + 0.2, y: m.y + 1.0, draw() { worker(m.x - 0.1, m.y + 0.95, 0, { face: 1, anim: m.has && m.t < T_MASON ? 'carve' : 'idle', ph: t * 6 + i * 2.1 }); } });
-  });
-  // sledge teams
-  for (const tm of teams) {
-    const moving = tm.state === 'go' || tm.state === 'back';
-    const d = tm.dir, z = surfaceZ(tm.x, tm.y), face = faceOf(d);
-    const placing = tm.kind === 'place' && tm.state === 'place';
-    const pull = [];
-    for (let r = 0; r < 2; r++) for (const s of [-0.42, 0.42]) {
-      let px, py;
-      if (placing || !moving) { px = tm.x + s * 2.2; py = tm.y + (r ? 1.1 : -1.1); }
-      else { const ahead = 1.5 + r * 0.95; px = tm.x + d[0] * ahead - d[1] * s; py = tm.y + d[1] * ahead + d[0] * s; }
-      pull.push([px, py, surfaceZ(px, py)]);
-    }
-    items.push({
-      x: tm.x, y: tm.y, draw() {
-        box(tm.x - 0.8, tm.y - 0.5, z, 1.6, 1.0, 0.14, C.wood, cam.T >= 9 ? 2 : 0);
-        if (tm.loaded && !placing) box(tm.x - 0.5, tm.y - 0.5, z + 0.14, 1, 1, BH, tm.kind === 'haul' ? C.raw : C.stone, cam.T >= 9 ? 2 : 1, tm.kind === 'haul' ? 'strata' : 'stone');
-        if (moving && cam.T >= 7) {
-          ctx.strokeStyle = '#7A5A32'; ctx.lineWidth = clamp(cam.T * 0.03, 0.6, 1.4);
-          const f = P(tm.x + d[0] * 0.8, tm.y + d[1] * 0.8, z + 0.2);
-          for (const p of pull) line(f, P(p[0], p[1], p[2] + 0.75));
-        }
-      }
-    });
-    pull.forEach((p, i) => items.push({
-      x: p[0], y: p[1], draw() {
-        const anim = placing ? 'carve' : moving ? (tm.loaded ? 'pull' : 'walk') : 'idle';
-        worker(p[0], p[1], p[2], { face: placing ? (p[0] > tm.x ? -1 : 1) : face, anim, ph: tm.ph + i * 1.9 });
-      }
-    }));
-    if (placing) {                                                  // the block slides off the sledge into its place
-      const k = clamp(tm.t / 1.5, 0, 1), e = k * k * (3 - 2 * k), tg = tm.target;
-      const bx = lerp(tm.from[0], tg.x, e), by = lerp(tm.from[1], tg.y, e), bz = lerp(surfaceZ(tm.from[0], tm.from[1]) + 0.14, tg.z, e);
-      items.push({ x: bx, y: by, draw() { box(bx - 0.5, by - 0.5, bz, 1, 1, BH, C.stone, 2, 'stone'); } });
-    }
-  }
-  // slot: draw just before the first static this mover stands behind (and could be hidden by)
-  for (const it of items) {
-    it.slot = statics.length;
-    const sxw = it.x - it.y;
-    for (let i = 0; i < statics.length; i++) {
-      const b = statics[i];
-      if (sxw < b.x0 - b.y1 - 3 || sxw > b.x1 - b.y0 + 3) continue;
-      const inFront = it.x >= b.x1 || it.y >= b.y1 || (it.x >= b.x0 && it.y >= b.y0);
-      if (!inFront) { it.slot = i; break; }
-    }
-  }
-  items.sort((a, b) => a.slot - b.slot || (a.x + a.y) - (b.x + b.y));
-  return items;
-}
-
-/* ============================================================
-   FRAME
-   ============================================================ */
-const fmt = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-function label(txt, sub, x, y, z, size) {
-  const [sx, sy] = P(x, y, z);
-  ctx.textAlign = 'center';
-  ctx.font = `${size}px Marcellus, Georgia, serif`;
-  ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(247,236,203,0.85)'; ctx.fillStyle = INK; ctx.lineJoin = 'round';
-  ctx.strokeText(txt, sx, sy); ctx.fillText(txt, sx, sy);
-  if (sub) { ctx.font = `500 ${Math.round(size * 0.62)}px Inter, system-ui, sans-serif`; ctx.strokeText(sub, sx, sy + size * 0.95); ctx.fillText(sub, sx, sy + size * 0.95); }
-}
-function render(now) {
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  drawGround(now);
-  const items = collectMovers(now);
-  let m = 0;
-  const lo = P(0, 0)[0];
-  for (let i = 0; i < statics.length; i++) {
-    while (m < items.length && items[m].slot === i) items[m++].draw();
-    const s = statics[i];
-    const sl = W / 2 + ((s.x0 - cam.x) - (s.y1 - cam.y)) * cam.T * 0.5, sr = W / 2 + ((s.x1 - cam.x) - (s.y0 - cam.y)) * cam.T * 0.5;
-    if (sr < -80 || sl > W + 80) continue;
-    s.draw();
-  }
-  while (m < items.length) items[m++].draw();
-  // labels
-  if (cam.T < 9) {
-    const sz = clamp(cam.T * 4.2, 15, 26);
-    label('Wielka Piramida', `0 / ${fmt(GREAT.total)} bloków`, GREAT.ox + GN / 2, GREAT.oy + GN / 2, GN * BH * 1.05, sz);
-    if (cam.T < 6.5) label('Mastaba', `${S.placed} / ${MASTABA.total}`, 6, 4, 9, clamp(cam.T * 3, 12, 17));
-  } else if (cam.T < 24) {
-    const sz = clamp(cam.T * 1.1, 12, 17);
-    label('Kamieniołom', null, 28, -58, 10.5, sz);
-    label('Plac kamieniarzy', null, 36, -6, 5, sz);
-    label('Wioska robotników', null, 58, 6, 7, sz);
-  }
-}
-
-let camAnim = null;
-function flyTo(to, dur) {
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { Object.assign(cam, to); camAnim = null; return; }
-  camAnim = { from: { ...cam }, to, t: 0, dur };
-}
-const views = {
-  site: () => ({ x: 19, y: -2, T: clamp(Math.min(W / 40, H / 22), 12, 46) }),
-  valley: () => ({ x: 40, y: -12, T: clamp(Math.min(W / 125, H / 66), 4, 16) }),
-  great: () => {                                                    // frame the whole pyramid with the building site at its foot
-    const cx = GREAT.ox + GN / 2, cy = GREAT.oy + GN / 2, mid = (cx + cy) / 4, top = mid - GN * BH * ZK, bot = 62;
-    const X = (cx - cy) / 2, Y = (top + bot) / 2;
-    return { x: X + 2 * Y, y: 2 * Y - X, T: clamp(Math.min(W / (GN * 1.12), H / ((bot - top) * 1.22)), 0.3, 9) };
-  }
-};
-
-let last = 0, hudT = 0;
-function frame(now) {
-  const real = Math.min(0.05, (now - last) / 1000 || 0); last = now;
-  if (camAnim) {
-    camAnim.t += real / camAnim.dur;
-    const k = clamp(camAnim.t, 0, 1), e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
-    cam.x = lerp(camAnim.from.x, camAnim.to.x, e); cam.y = lerp(camAnim.from.y, camAnim.to.y, e);
-    cam.T = Math.exp(lerp(Math.log(camAnim.from.T), Math.log(camAnim.to.T), e));
-    if (k >= 1) camAnim = null;
-  }
-  const n = Math.max(1, Math.round(S.speed));
-  for (let i = 0; i < n; i++) step(real * S.speed / n);
-  render(now);
-  hudT += real;
-  if (hudT > 0.2) { hudT = 0; hud(); }
-  requestAnimationFrame(frame);
-}
-
-/* ---------- HUD ---------- */
-const $ = id => document.getElementById(id);
-function hud() {
-  $('vM').textContent = `${S.placed} / ${MASTABA.total}`;
-  $('vG').textContent = `0 / ${fmt(GREAT.total)}`;
-  $('bM').style.width = (100 * S.placed / MASTABA.total).toFixed(1) + '%';
-  const days = GREAT.total / S.rate / 86400;
-  $('eta').textContent = S.done ? 'mastaba gotowa, ekipy czekają na nowy projekt' : `w tym tempie: około ${fmt(days)} dni ciągłej pracy`;
-}
-function onDone() { $('again').hidden = false; }
-function setSpeed(v) { S.speed = v; for (const [id, s] of [['s1', 1], ['s4', 4], ['s16', 16]]) $(id).setAttribute('aria-pressed', String(s === v)); }
-$('s1').onclick = () => setSpeed(1); $('s4').onclick = () => setSpeed(4); $('s16').onclick = () => setSpeed(16);
-$('vSite').onclick = () => flyTo(views.site(), 1.6);
-$('vValley').onclick = () => flyTo(views.valley(), 1.6);
-$('vGreat').onclick = () => flyTo(views.great(), 2.2);
-$('again').onclick = () => {
-  Object.assign(S, { placed: 0, inFlight: 0, rampZ: 0, done: false, flashIdx: -1, stamps: [] });
-  for (const tm of teams) { tm.state = 'wait'; tm.loaded = false; tm.x = tm.hx; tm.y = tm.hy; }
-  $('again').hidden = true;
-};
-
-/* ---------- camera input ---------- */
-const ptrs = new Map(); let pinch = 0;
-cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]); camAnim = null; cv.classList.add('drag'); $('hint').hidden = true; });
-cv.addEventListener('pointermove', e => {
-  const p = ptrs.get(e.pointerId); if (!p) return;
-  const dx = e.clientX - p[0], dy = e.clientY - p[1]; p[0] = e.clientX; p[1] = e.clientY;
-  if (ptrs.size === 1) {
-    const a = dx / (cam.T * 0.5), b = dy / (cam.T * 0.25);
-    cam.x -= (a + b) / 2; cam.y -= (b - a) / 2;
-  } else if (ptrs.size === 2) {
-    const [q, r] = [...ptrs.values()], d = Math.hypot(q[0] - r[0], q[1] - r[1]);
-    if (pinch) zoomAt((q[0] + r[0]) / 2, (q[1] + r[1]) / 2, d / pinch);
-    pinch = d;
-  }
-});
-const up = e => { ptrs.delete(e.pointerId); pinch = 0; if (!ptrs.size) cv.classList.remove('drag'); };
-cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-function zoomAt(cx, cy, f) {
-  const r = cv.getBoundingClientRect(), sx = cx - r.left, sy = cy - r.top;
-  const before = unproj(sx, sy);
-  cam.T = clamp(cam.T * f, 0.5, 72);
-  const after = unproj(sx, sy);
-  cam.x += before[0] - after[0]; cam.y += before[1] - after[1];
-}
-cv.addEventListener('wheel', e => { e.preventDefault(); camAnim = null; $('hint').hidden = true; zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0014)); }, { passive: false });
-
-function resize() {
-  const r = cv.getBoundingClientRect();
-  W = Math.max(50, r.width); H = Math.max(50, r.height); DPR = Math.min(window.devicePixelRatio || 1, 2);
-  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
-}
-addEventListener('resize', resize);
-
-function start(data) {
-  resize();
-  if (data && typeof data.placed === 'number') {
-    S.placed = clamp(data.placed, 0, MASTABA.total); S.rampZ = workCourse() * BH; S.done = S.placed >= MASTABA.total;
-    if (S.done) onDone();
-    if (data.cam) Object.assign(cam, data.cam);
-  } else {
-    // open on the thesis: the whole plateau, with the mastaba as a speck beside what is to come
-    Object.assign(cam, views.great());
-    setTimeout(() => { if (!ptrs.size && !camAnim) flyTo(views.site(), 3.2); }, 2200);
-  }
-  hud();
-  requestAnimationFrame(t => { last = t; frame(t); });
-}
-const hot = window.claude && window.claude.hot;
-if (hot && hot.snapshot) hot.snapshot(() => ({ placed: S.placed, cam: { ...cam } }));
-if (hot && hot.ready) hot.ready(start); else start((hot && hot.data) || {});
-window.__faraon = { S, cam, views, flyTo };
-})();
-</script>
+<script src="js/sim.js"></script>
+<script src="js/gfx.js"></script>
+<script src="js/scene.js"></script>
+<script src="js/app.js"></script>
