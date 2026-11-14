@@ -61,6 +61,7 @@ function shown(key) {
   const s = g.s;
   if (key === 'equarry' || key === 'boat' || key === 'E' || key === 'W' || key === 'Bw' || key === 'Cw') return s.east;
   if (key === 'quarry' || key === 'A') return s.quarryLeft > 0 || s.piles.A > 0;
+  if (key === 'great') return s.greatSeen;
   if (key === 'B' || key === 'C') return !s.east || s.quarryLeft > 0 || s.piles.A + s.piles.B + s.piles.C > 0;
   return true;
 }
@@ -134,7 +135,8 @@ function updateUi() {
     setText(b.querySelector('.cost'), left > 0 ? '…' : fmt(e.cost));
     b.disabled = left > 0 || g.free() < e.crew || s.racje < e.cost;
   }
-  // the Great Pyramid
+  // the Great Pyramid, once the player has been shown it
+  $('greatSec').hidden = !s.greatSeen; $('viewGreat').hidden = !s.greatSeen;
   setText($('greatVal'), `${fmt(s.great)} / ${fmt(g.great.total)}`);
   const gc = g.capacity('great');
   setText($('greatEta'), s.great >= g.great.total ? 'ukończona' : gc > 0 ? `przy tych ekipach: ${fmtSpan((g.great.total - s.great) / gc)}` : 'nikt jeszcze nie ciągnie pod nią bloków');
@@ -156,7 +158,7 @@ const HINTS = [
   ['low', s => s.east && s.quarryLeft < 160 && s.quarryLeft > 0 && (s.assign.equarry === 0 || s.assign.boat === 0), 'Miejscowa skała zaraz się skończy. Obsadź kamieniołom za rzeką i barki, zanim stanie cała budowa.', 14],
   ['pyr', s => s.project === 'pyramid', 'Piramida zaczyna od białej okładziny, więc pierwsze bloki muszą przypłynąć zza rzeki. W środku idzie żółty kamień, wokół komory granit, na szczyt złoty czubek. Granit i złoto przywożą wyprawy.', 18],
   ['over', s => s.blocks >= 30 && !s.over.quarry, 'Odblokowany pierwszy nadzorca. Popędza stację za Ciebie i zostaje na zawsze, także po pochówku.', 12],
-  ['great', s => s.workers >= 22 && s.great === 0, 'Masz już sporą załogę. Ekipa wysłana pod Wielką Piramidę nie zarabia racji, ale jej bloki zostają na zawsze i przyspieszają wszystko.', 14],
+  ['great', s => s.greatSeen && s.workers >= 18 && s.great === 0, 'Masz już sporą załogę. Ekipa wysłana pod Wielką Piramidę nie zarabia racji, ale jej bloki zostają na zawsze i przyspieszają wszystko.', 14],
   ['bank', s => s.bank >= 600, 'Uzbierał się zapas czasu. Przyciski ×3 i ×10 na dole przyspieszają budowę, dopóki go starczy.', 12]
 ];
 function hints() {
@@ -169,13 +171,20 @@ function openBurial() {
   const s = g.s, gain = g.kaGain();
   setText($('burialTitle'), `${g.project().name} ukończona`);
   setText($('burialGain'), `+${gain} Ka`);
+  // a line about the levelled rock, until the day it is explained
+  const n = s.tombs.length, lore = $('burialLore');
+  lore.hidden = s.greatSeen && g.project().kind !== 'pyr';
+  setText(lore, s.greatSeen ? '' : g.project().kind === 'pyr' ? 'Następca długo patrzył na piramidę ojca. Potem kazał się zaprowadzić na wyrównaną skałę na płaskowyżu.'
+    : n === 0 ? 'Przed śmiercią faraon kazał wyrównać na płaskowyżu wielki kwadrat skały. Kapłani nie mówią po co.'
+    : n === 1 ? 'Na wyrównanej skale mierniczowie wbili paliki i rozciągnęli sznury. Kwadrat jest większy niż całe miasto.'
+    : 'Sznury na płaskowyżu wciąż czekają. Nikt nie śmie na nich budować.');
   const box = $('burialNext'); box.textContent = '';
   for (const p of Sim.PROJECTS) {
     const st = Sim.mkStruct(0, 0, p.a, p.b, p.n), ok = s.tombs.length + 1 >= p.need && (!p.river || s.east);
     const b = document.createElement('button'); b.type = 'button'; b.className = 'buy'; b.disabled = !ok;
     const why = ok ? (p.kind ? 'biała okładzina, granitowa komora, złoty czubek; ' : '') : s.tombs.length + 1 < p.need ? `po ${p.need} grobowcach; ` : 'potrzebny kamień zza rzeki; ';
     b.innerHTML = `<span class="lab">${p.name}</span><span class="sub">${why}${fmt(st.total)} bloków, około ${Math.round(Math.pow(st.total, 0.6) / 3 * (p.kaMult || 1))} Ka</span><span class="cost">${ok ? 'Buduj' : '—'}</span>`;
-    b.onclick = () => { if (g.bury(p.id)) { $('burial').hidden = true; save(true); toast(`Panowanie ${ROMAN(g.s.reign)}. Stary grobowiec zostaje w dolinie.`, 7); } };
+    b.onclick = () => { const shown = g.s.greatSeen; if (g.bury(p.id)) { $('burial').hidden = true; save(true); if (g.s.greatSeen === shown) toast(`Panowanie ${ROMAN(g.s.reign)}. Stary grobowiec zostaje w dolinie.`, 7); } };
     box.append(b);
   }
   const tease = document.createElement('p'); tease.className = 'note'; tease.textContent = 'Większe piramidy: budowniczowie jeszcze nie znają tej techniki.'; box.append(tease);
@@ -278,7 +287,7 @@ $('importFile').addEventListener('change', e => { const f = e.target.files[0]; i
 document.addEventListener('visibilitychange', () => { if (document.hidden && g) save(true); });
 
 /* ---------- main loop ---------- */
-let warp = 1, last = 0, uiT = 0, started = false;
+let warp = 1, last = 0, uiT = 0, started = false, reveal = false;
 function bankAdd(sec) { g.s.bank = Math.min(Sim.BASE.bankCap, g.s.bank + sec); }
 function frame(now) {
   let real = (now - last) / 1000 || 0; last = now;
@@ -302,7 +311,12 @@ function frame(now) {
     else if (ev.type === 'exp') toast(ev.id === 'aswan' ? 'Wyprawa wróciła z Asuanu z granitem.' : 'Wyprawa wróciła z Nubii. Złoty czubek czeka na placu.', 8);
     else if (ev.type === 'quarryOut') toast('Miejscowy kamieniołom jest wybrany do końca. Od teraz cały kamień płynie zza rzeki.', 12);
     else if (ev.type === 'done') { toast('Grobowiec gotowy.'); save(true); openBurial(); }
-    else if (ev.type === 'reign') { Scene.rebuild(); flyTo(Scene.views.site(), 2); }
+    else if (ev.type === 'reveal') reveal = true;
+    else if (ev.type === 'reign') {
+      Scene.rebuild();
+      if (reveal) { reveal = false; flyTo(Scene.views.great(), 5); toast(`Nowy faraon rysuje na wyrównanej skale grobowiec, jakiego nie było: ${fmt(g.great.total)} bloków. Ekipy mogą już ciągnąć pod niego kamień.`, 20); }
+      else flyTo(Scene.views.site(), 2);
+    }
   }
   g.events.length = 0;
   Scene.render(now);
@@ -323,9 +337,9 @@ function start(hot) {
   const saved = (hot && hot.state) || readLocal();
   boot(saved);
   if (hot && hot.cam) Object.assign(cam, hot.cam);
-  else if (!saved) {                                                  // a new game opens on the thesis: the whole plateau, then down to the site
-    Object.assign(cam, Scene.views.great());
-    setTimeout(() => { if (!ptrs.size && !camAnim) flyTo(Scene.views.site(), 3.2); }, 2200);
+  else if (!saved) {                                                  // a new game opens on the valley, then comes down to the site
+    Object.assign(cam, Scene.views.valley());
+    setTimeout(() => { if (!ptrs.size && !camAnim) flyTo(Scene.views.site(), 3.2); }, 1800);
   } else Object.assign(cam, Scene.views.site());
   if (!started) { started = true; addEventListener('resize', fit); requestAnimationFrame(t => { last = t; frame(t); }); cloudInit(); }
 }

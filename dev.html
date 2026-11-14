@@ -121,7 +121,7 @@ textarea{width:100%;min-height:74px;background:var(--lapis-3);color:var(--papyru
 </style>
 
 <div id="stage">
-  <canvas id="scene" role="img" aria-label="Dolina w rzucie izometrycznym: kamieniołom, plac kamieniarzy, grobowiec w budowie, wioska nad Nilem i obrys Wielkiej Piramidy"></canvas>
+  <canvas id="scene" role="img" aria-label="Dolina w rzucie izometrycznym: kamieniołom, plac kamieniarzy, grobowiec w budowie i wioska nad Nilem"></canvas>
   <div class="hud">
     <div class="top">
       <header class="plaque brand">
@@ -151,7 +151,7 @@ textarea{width:100%;min-height:74px;background:var(--lapis-3);color:var(--papyru
           <h3>Łańcuch kamienia</h3>
           <div class="chain" id="chain"></div>
         </section>
-        <section class="goal">
+        <section class="goal" id="greatSec" hidden>
           <b>Wielka Piramida</b><output id="greatVal">0</output>
           <small id="greatEta"></small>
           <small id="greatBonus"></small>
@@ -182,7 +182,7 @@ textarea{width:100%;min-height:74px;background:var(--lapis-3);color:var(--papyru
       <div class="grp"><span>Widok</span>
         <button type="button" data-view="site">Budowa</button>
         <button type="button" data-view="valley">Dolina</button>
-        <button type="button" data-view="great">Wielka</button>
+        <button type="button" data-view="great" id="viewGreat" hidden>Wielka</button>
         <button type="button" data-view="river" id="viewRiver" hidden>Rzeka</button>
       </div>
       <div class="grp" title="Kiedy gra jest zamknięta albo karta schowana, budowa stoi, a czas odkłada się tutaj. Wydajesz go na przyspieszenie."><span>Zapas czasu</span><b id="bankVal">0 s</b>
@@ -199,8 +199,9 @@ textarea{width:100%;min-height:74px;background:var(--lapis-3);color:var(--papyru
       <h2 id="burialTitle">Mastaba ukończona</h2>
       <p>Faraon spocznie w swoim grobowcu. Jego następca zaczyna budowę od nowa, ale nie od zera.</p>
       <div class="gain" id="burialGain">+10 Ka</div>
+      <p class="note" id="burialLore" hidden></p>
       <div class="keep">
-        <div><h3>Zostaje</h3><ul><li>grobowiec w dolinie</li><li>nadzorcy</li><li>Ka i to, co za nie kupisz</li><li>bloki Wielkiej Piramidy</li><li>zapas czasu</li></ul></div>
+        <div><h3>Zostaje</h3><ul><li>grobowiec w dolinie</li><li>nadzorcy</li><li>Ka i to, co za nie kupisz</li><li>wszystko, co stoi w dolinie</li><li>zapas czasu</li></ul></div>
         <div><h3>Przepada</h3><ul><li>racje</li><li>najęci robotnicy</li><li>narzędzia, stosy, wprawna ręka</li></ul></div>
       </div>
       <h3>Co buduje następca</h3>
@@ -225,7 +226,7 @@ textarea{width:100%;min-height:74px;background:var(--lapis-3);color:var(--papyru
         <button type="button" id="menuClose">Zamknij</button>
       </div>
       <div class="rowb" id="resetAsk" hidden>
-        <span>Na pewno? Przepadnie wszystko, także Wielka Piramida.</span>
+        <span>Na pewno? Przepadnie wszystko, razem z doliną.</span>
         <button type="button" id="resetYes">Tak, od zera</button>
         <button type="button" id="resetNo">Nie</button>
       </div>

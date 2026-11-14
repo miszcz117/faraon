@@ -101,7 +101,7 @@ function addHouse(kind, x, y, need) {
   add({ x0: x, y0: y, x1: x + k.w, y1: y + k.d, h: k.h, shadow: true, visible: () => need === undefined || g.s.workers >= need, draw(now) { house(o, now); } });
 }
 function buildWorld() {
-  add({ x0: L.greatFront[0] - GN, y0: L.greatFront[1] - GN, x1: L.greatFront[0], y1: L.greatFront[1], draw() { drawGhost(g.great, true); drawStruct(g.great, g.s.great, g.flash.great); } });
+  add({ x0: L.greatFront[0] - GN, y0: L.greatFront[1] - GN, x1: L.greatFront[0], y1: L.greatFront[1], draw() { if (g.s.greatSeen) drawGhost(g.great, true); drawStruct(g.great, g.s.great, g.flash.great); } });
   benches.forEach((b, i) => add({ x0: b.x, y0: b.y, x1: b.x + b.w, y1: b.y + b.d, shadow: true,
     box() { const q = quarryNow().out[i]; return q.gone ? null : [q.x, q.y, q.x + q.w, q.y + q.d, q.h]; }, draw() { const q = quarryNow().out[i]; if (!q.gone) rockBench(q); } }));
   for (const b of EAST) add({ x0: b.x, y0: b.y, x1: b.x + b.w, y1: b.y + b.d, h: b.h, shadow: true, draw() { rockBench(b); } });
@@ -191,7 +191,7 @@ function roads() {
   return [
     { pts: [[33.6, -35.8], [32.6, -26], [35, -18], [35.6, -13.4], [35.6, -2]], half: 2.3, ruts: true },
     { pts: [[35.6, -1], [34.4, 2.6], [Math.max(31, L.eastX + (g.site.n - 1) * BH * g.slope() + 3), mid], [L.eastX + 0.5, mid]], half: 1.9, ruts: true },
-    { pts: [[33, -4.6]].concat(L.greatRoad, [[-90, 24.4]]), half: 1.6 },
+    ...(g.s.greatSeen ? [{ pts: [[33, -4.6]].concat(L.greatRoad, [[-90, 24.4]]), half: 1.6 }] : []),
     { pts: [[38, 3], [46, 4], [52, 6]], half: 1.5 }
   ].concat(g.s.east ? [{ pts: [[91.6, -12.6]].concat(L.harborRoad.slice(1)), half: 1.9, ruts: true }] : []);
 }
@@ -214,6 +214,13 @@ function drawGround(now) {
   // levelled bedrock where the Great Pyramid will stand
   const G0 = g.great, gp = [P(G0.ox - 6, G0.oy - 6), P(G0.ox + GN + 6, G0.oy - 6), P(G0.ox + GN + 6, G0.oy + GN + 6), P(G0.ox - 6, G0.oy + GN + 6)];
   fillPoly(gp, 'rgba(250,236,196,0.55)'); ctx.strokeStyle = 'rgba(74,46,22,0.35)'; ctx.lineWidth = 1; path(gp); ctx.stroke();
+  if (!g.s.greatSeen && g.s.tombs.length >= 1) {                      // before anyone says what it is for: surveyors' stakes and cords, later the pegged-out base
+    const c = [[G0.ox, G0.oy], [G0.ox + GN, G0.oy], [G0.ox + GN, G0.oy + GN], [G0.ox, G0.oy + GN]].map(q => P(q[0], q[1]));
+    ctx.strokeStyle = 'rgba(122,84,40,0.5)'; ctx.lineWidth = clamp(cam.T * 0.05, 0.8, 1.6);
+    line(c[0], c[2]); line(c[1], c[3]);
+    if (g.s.tombs.length >= 2) { ctx.setLineDash([6, 5]); path(c); ctx.stroke(); ctx.setLineDash([]); }
+    for (const q of c) { ctx.fillStyle = '#7A5229'; ctx.fillRect(q[0] - 1.5, q[1] - Math.max(4, cam.T * 1.2), 3, Math.max(4, cam.T * 1.2)); }
+  }
   if (vb.x1 > 62) {                                                   // the river plain
     const ys = []; for (let y = Math.floor(vb.y0 / 6) * 6; y <= vb.y1 + 6; y += 6) ys.push(y);
     const band = (fa, fb, fill, tex, a, mul, oy) => {
@@ -423,7 +430,7 @@ function render(now) {
   while (m < items.length) items[m++].draw();
   const st = g.site;
   if (cam.T < 9) {
-    label('Wielka Piramida', `${fmt(g.s.great)} / ${fmt(g.great.total)} bloków`, g.great.ox + GN / 2, g.great.oy + GN / 2, GN * BH * 1.05, clamp(cam.T * 4.2, 15, 26));
+    if (g.s.greatSeen) label('Wielka Piramida', `${fmt(g.s.great)} / ${fmt(g.great.total)} bloków`, g.great.ox + GN / 2, g.great.oy + GN / 2, GN * BH * 1.05, clamp(cam.T * 4.2, 15, 26));
     if (cam.T < 6.5) label(g.project().name, `${g.s.placed} / ${st.total}`, st.ox + st.a / 2, st.oy + st.b / 2, st.n * BH + 7, clamp(cam.T * 3, 12, 17));
   } else if (cam.T < 26) {
     const sz = clamp(cam.T * 1.1, 12, 17);
@@ -455,7 +462,7 @@ function hit(sx, sy) {
   if (inBox(zoneBox(21.5, -14, 40.5, -4.6, 1.6), sx, sy)) return 'mason';
   if (g.s.quarryLeft > 0 && inBox(zoneBox(12, -62, 44, -39.8, 7), sx, sy)) return 'quarry';
   if (inBox(zoneBox(29.5, -35, 39, -13, 0.5), sx, sy) || (g.s.east && inBox(zoneBox(40, -14.6, 90, -10.6, 0.5), sx, sy))) return 'haul';
-  if (g.s.assign.great > 0 && inBox(zoneBox(g.great.ox, g.great.oy, g.great.ox + GN, g.great.oy + GN, 2), sx, sy)) return 'great';
+  if (g.s.greatSeen && g.s.assign.great > 0 && inBox(zoneBox(g.great.ox, g.great.oy, g.great.ox + GN, g.great.oy + GN, 2), sx, sy)) return 'great';
   return null;
 }
 /* Views leave room for the panel on the right: the focus lands in the middle of the free part of the screen. */

@@ -70,7 +70,7 @@ const rampNeed = (k, slope) => Math.round(0.888 * (slope || 6) * (2 * k - 1));
 
 function fresh() {
   return {
-    v: 3, t: 0, played: 0, savedAt: 0, reign: 1, project: 'mastaba', siteY: 0, placed: 0, great: 0, racje: 8, workers: 10, hints: {},
+    v: 4, t: 0, played: 0, greatSeen: false, savedAt: 0, reign: 1, project: 'mastaba', siteY: 0, placed: 0, great: 0, racje: 8, workers: 10, hints: {},
     assign: { quarry: 1, equarry: 0, boat: 0, haul: 4, mason: 1, ramp: 0, place: 4, great: 0 }, piles: { A: 3, B: 2, C: 3, E: 0, W: 0, Bw: 0, Cw: 0 },
     lvl: { quarry: 0, equarry: 0, boat: 0, haul: 0, mason: 0, ramp: 0, place: 0, great: 0, pile: 0, hand: 0 }, over: {}, wq: 0, wm: 0, we: 0, wr: 0,
     quarryLeft: L.quarryTotal, east: false, rampK: 0, rampFill: 0, granite: 0, gold: 0, away: 0, exp: { aswan: 0, nubia: 0 },
@@ -87,7 +87,11 @@ function migrate(saved) {
     s.quarryLeft = Math.max(250, L.quarryTotal - (saved.blocks || 0) - (saved.great || 0));
     s.rampK = -1;                                     // "as high as the wall already is", resolved once the site is known
   }
-  s.v = 3;
+  if ((saved.v || 1) < 4) {                           // the Great Pyramid is no longer shown from the first minute
+    s.greatSeen = (saved.tombs || []).some(t => t.id === 'pyramid');
+    if (!s.greatSeen) s.assign.great = 0;
+  }
+  s.v = 4;
   return s;
 }
 
@@ -356,7 +360,7 @@ function create(saved) {
   /* ---------- decisions ---------- */
   function setAssign(st, dir) {
     const u = UNIT[st];
-    if (dir > 0 && ((st === 'quarry' && !localStone()) || ((st === 'equarry' || st === 'boat') && !s.east))) return false;
+    if (dir > 0 && ((st === 'quarry' && !localStone()) || ((st === 'equarry' || st === 'boat') && !s.east) || (st === 'great' && !s.greatSeen))) return false;
     if (dir > 0) { if (free() < u) return false; s.assign[st] += u; } else { if (s.assign[st] < u) return false; s.assign[st] -= u; }
     syncTeams(); return true;
   }
@@ -389,6 +393,8 @@ function create(saved) {
     const next = PROJECTS.find(p => p.id === nextId && s.tombs.length + 1 >= p.need && (!p.river || s.east)); if (!next) return false;
     const p = project();
     s.ka += kaGain();
+    // the first true pyramid is what makes the next pharaoh dream of the Great one
+    if (p.kind === 'pyr' && !s.greatSeen) { s.greatSeen = true; g.events.push({ type: 'reveal' }); }
     s.tombs.push({ id: p.id, a: p.a, b: p.b, n: p.n, ox: g.site.ox, oy: g.site.oy, reign: s.reign });
     s.siteY = g.site.oy + p.b + 10; s.reign++; s.project = next.id; s.placed = 0; s.racje = 0;
     s.workers = startWorkers();
