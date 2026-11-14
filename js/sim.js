@@ -70,7 +70,7 @@ const rampNeed = (k, slope) => Math.round(0.888 * (slope || 6) * (2 * k - 1));
 
 function fresh() {
   return {
-    v: 2, t: 0, played: 0, savedAt: 0, reign: 1, project: 'mastaba', siteY: 0, placed: 0, great: 0, racje: 8, workers: 10, hints: {},
+    v: 3, t: 0, played: 0, savedAt: 0, reign: 1, project: 'mastaba', siteY: 0, placed: 0, great: 0, racje: 8, workers: 10, hints: {},
     assign: { quarry: 1, equarry: 0, boat: 0, haul: 4, mason: 1, ramp: 0, place: 4, great: 0 }, piles: { A: 3, B: 2, C: 3, E: 0, W: 0, Bw: 0, Cw: 0 },
     lvl: { quarry: 0, equarry: 0, boat: 0, haul: 0, mason: 0, ramp: 0, place: 0, great: 0, pile: 0, hand: 0 }, over: {}, wq: 0, wm: 0, we: 0, wr: 0,
     quarryLeft: L.quarryTotal, east: false, rampK: 0, rampFill: 0, granite: 0, gold: 0, away: 0, exp: { aswan: 0, nubia: 0 },
@@ -87,16 +87,16 @@ function migrate(saved) {
     s.quarryLeft = Math.max(250, L.quarryTotal - (saved.blocks || 0) - (saved.great || 0));
     s.rampK = -1;                                     // "as high as the wall already is", resolved once the site is known
   }
-  s.v = 2;
+  s.v = 3;
   return s;
 }
 
 function create(saved) {
-  const s = migrate(saved);
+  const s = migrate(saved), before3 = !!saved && typeof saved === 'object' && (saved.v || 1) < 3;
   const g = {
     s, BH, great: mkStruct(L.greatFront[0] - L.greatN, L.greatFront[1] - L.greatN, L.greatN, L.greatN, L.greatN, L.greatStrip),
     site: null, teams: { haul: [], place: [], great: [], boat: [] }, inFlight: { place: 0, great: 0 }, boost: { haul: 0, place: 0, great: 0, boat: 0 },
-    rampZ: 0, rampDown: 0, events: [], lane: {}, flash: { place: { idx: -1, t: 0 }, great: { idx: -1, t: 0 } }, stamps: [], rate: 0, handPulse: {}
+    rampZ: 0, rampDown: 0, incoming: { B: 0, Bw: 0 }, events: [], lane: {}, flash: { place: { idx: -1, t: 0 }, great: { idx: -1, t: 0 } }, stamps: [], rate: 0, handPulse: {}
   };
   const project = () => PROJECTS.find(p => p.id === s.project) || PROJECTS[0];
   const slope = () => project().slope || L.rampSlope;
@@ -109,7 +109,7 @@ function create(saved) {
   const rampEdge = () => L.eastX - Math.max(0, Math.max(s.rampK, 1) - 1) / 2;
   const cap = () => 8 + 4 * s.lvl.pile;
   const free = () => s.workers - s.away - STATIONS.reduce((n, k) => n + s.assign[k], 0);
-  const startWorkers = () => 10 + 5 * s.kaLvl.crew;
+  const startWorkers = () => 10 + 5 * s.kaLvl.crew + (s.east ? 4 : 0);   // the river chain needs more hands, and the jetty brings settlers
   const globalMult = () => Math.pow(1.5, s.kaLvl.speed) * (1 + 0.02 * Math.sqrt(s.great));
   const mult = st => Math.pow(1.25, s.lvl[st]) * globalMult();
   const localStone = () => s.quarryLeft > 0;
@@ -131,13 +131,12 @@ function create(saved) {
   }
 
   /* Take one dressed block of the wanted stone off the yard. Core blocks take local stone, or white once the local stone is gone for good. */
-  const localGone = () => !localStone() && s.piles.A + s.piles.B + s.piles.C === 0;
   function canTake(req) {
     if (req === 'g') return s.granite > 0 ? 'g' : null;
     if (req === 'gold') return s.gold > 0 ? 'gold' : null;
     if (req === 'w') return s.piles.Cw > 0 ? 'w' : null;
     if (s.piles.C > 0) return 'l';
-    return s.piles.Cw > 0 && (req === null || localGone()) ? 'w' : null;
+    return s.piles.Cw > 0 && (req === null || s.piles.B === 0) ? 'w' : null;   // core takes white too when the yard has no yellow left
   }
   function takeDressed(req) {
     const m = canTake(req);
@@ -192,23 +191,37 @@ function create(saved) {
 
   const routeToB = tm => tm.base === 'W' ? L.harborRoad.slice(1).map(p => [p[0], p[1] + tm.lane * 0.5]) : L.roadAB.slice(1).map(p => [p[0] + tm.lane * 1.4, p[1]]);
   const routeFromB = tm => { const r = (tm.base === 'W' ? L.harborRoad.slice(0, -1).reverse().map(p => [p[0], p[1] + tm.lane * 0.5]) : L.roadAB.slice(0, -1).reverse().map(p => [p[0] + tm.lane * 1.4, p[1]])); r.push([tm.hx, tm.hy]); return r; };
-  /* Sledge crews serve whichever source has stone: the local quarry, or the west jetty once barges run. */
+  /* Sledge crews serve whichever source the yard has room for: yellow stone from the local quarry, white from the west jetty.
+     A crew only sets off when its block will have somewhere to go, so nobody stands at a full pile holding stone the wall cannot use. */
+  const destOf = src => src === 'W' ? 'Bw' : 'B';
+  const roomFor = src => cap() - s.piles[destOf(src)] - g.incoming[destOf(src)];
+  const wanted = src => s.piles[src] > 0 && roomFor(src) > 0;
+  function pickBase(tm) {
+    const own = tm.base, other = own === 'A' ? 'W' : 'A', wo = wanted(own), wt = wanted(other);
+    if (wo && wt) return roomFor(other) > roomFor(own) + 2 ? other : own;      // both useful: go where the yard is emptier
+    return wo ? own : wt ? other : own;
+  }
+  function setBase(tm, base) { tm.base = base; const h = home('haul', tm.i, base); tm.hx = h[0]; tm.hy = h[1]; }
   function stepHaul(tm, dt) {
     if (tm.state === 'wait') {
       if (tm.retire) return;
-      const src = tm.base, other = src === 'A' ? 'W' : 'A';
-      if (s.piles[src] > 0 && laneFree(tm)) { depart(tm); s.piles[src]--; tm.loaded = true; tm.from = src; go(tm, routeToB(tm), 'go'); }
-      else if (s.piles[src] === 0 && s.piles[other] >= 2 && (src === 'A' ? !localStone() || s.assign.quarry === 0 : true)) {
-        const via = routeToB(tm); tm.base = other; const h = home('haul', tm.i, other); tm.hx = h[0]; tm.hy = h[1];
-        go(tm, via.concat(routeFromB(tm)), 'back');                 // walk over to the other source, by way of the yard
+      tm.idle = (tm.idle || 0) + dt;
+      const b = pickBase(tm);
+      if (b !== tm.base) {
+        if (tm.idle > 3) { const via = routeToB(tm); setBase(tm, b); tm.idle = 0; go(tm, via.concat(routeFromB(tm)), 'back'); }   // walk over to the other source, by way of the yard
+      } else if (wanted(b) && laneFree(tm)) {
+        depart(tm); s.piles[b]--; g.incoming[destOf(b)]++; tm.loaded = true; tm.from = b; tm.idle = 0; go(tm, routeToB(tm), 'go');
       }
     } else if (tm.state === 'go') {
       if (follow(tm, dt * speed(tm, BASE.haulV))) { tm.state = 'unload'; tm.t = 0; }
     } else if (tm.state === 'unload') {
-      tm.t += dt;
-      const dest = tm.from === 'W' ? 'Bw' : 'B';                    // white stone from the river is kept apart from the local stone
-      if (tm.t > BASE.unload && s.piles[dest] < cap()) { s.piles[dest]++; tm.loaded = false; go(tm, routeFromB(tm), 'back'); }
-    } else if (follow(tm, dt * speed(tm, BASE.haulBack))) tm.state = 'wait';
+      tm.t += dt; const dest = destOf(tm.from);
+      if (tm.t > BASE.unload && s.piles[dest] < cap()) {
+        s.piles[dest]++; g.incoming[dest]--; tm.loaded = false;
+        const nb = pickBase(tm); if (nb !== tm.base) setBase(tm, nb);  // from the yard both roads are open: head for the source that is needed
+        go(tm, routeFromB(tm), 'back');
+      } else if (tm.t > 8) { g.incoming[dest]--; go(tm, routeFromB(tm), 'back'); }   // no room after all: take the block back
+    } else if (follow(tm, dt * speed(tm, BASE.haulBack))) { if (tm.loaded) { s.piles[tm.from]++; tm.loaded = false; } tm.state = 'wait'; }
   }
   /* Barges carry stone in batches: they fill up at the east jetty, cross, and empty onto the west one. */
   function stepBoat(tm, dt) {
@@ -382,11 +395,12 @@ function create(saved) {
     const loc = localStone();
     s.assign = { quarry: loc ? 1 : 0, equarry: loc ? 0 : 1, boat: 0, haul: 4, mason: 1, ramp: 0, place: 4, great: 0 };
     s.piles = { A: loc ? 3 : 0, B: loc ? 2 : 0, C: loc ? 3 : 0, E: 0, W: loc ? 0 : 6, Bw: loc ? 0 : 2, Cw: loc ? 0 : 3 };
+    if (next.river) { s.piles.Cw = 6; s.piles.Bw = 4; s.piles.W = 6; }   // a pyramid opens with white casing: the first blocks are waiting
     s.away = 0; s.exp = { aswan: 0, nubia: 0 };                     // crews still away are called back empty-handed
     s.lvl = { quarry: 0, equarry: 0, boat: 0, haul: 0, mason: 0, ramp: 0, place: 0, great: 0, pile: 0, hand: 0 };
     s.wq = 0; s.wm = 0; s.we = 0; s.wr = 0; s.rampK = 0; s.rampFill = 0;
     g.teams = { haul: [], place: [], great: [], boat: [] }; g.inFlight = { place: 0, great: 0 }; g.boost = { haul: 0, place: 0, great: 0, boat: 0 }; g.stamps = []; g.rate = 0; g.lane = {};
-    g.rampDown = 0; setSite(); syncTeams();
+    g.rampDown = 0; g.incoming = { B: 0, Bw: 0 }; setSite(); syncTeams();
     g.events.push({ type: 'reign' });
     return true;
   }
@@ -420,7 +434,7 @@ function create(saved) {
     if (st === 'quarry') return s.piles.A >= c ? 'blocked' : 'ok';
     if (st === 'equarry') return s.piles.E >= c ? 'blocked' : 'ok';
     if (st === 'boat') return s.piles.E <= 0 && g.teams.boat.every(t => t.state === 'load' && t.cargo === 0) ? 'starved' : s.piles.W >= c && g.teams.boat.some(t => t.state === 'unload') ? 'blocked' : 'ok';
-    if (st === 'haul') return s.piles.A + s.piles.W <= 0 && g.teams.haul.every(t => t.state === 'wait') ? 'starved' : g.teams.haul.some(t => t.state === 'unload' && t.t > 1) ? 'blocked' : 'ok';
+    if (st === 'haul') { const idle = g.teams.haul.every(t => t.state === 'wait'); return idle && s.piles.A + s.piles.W <= 0 ? 'starved' : idle && !wanted('A') && !wanted('W') ? 'blocked' : 'ok'; }
     if (st === 'mason') return s.piles.B + s.piles.Bw <= 0 ? 'starved' : (s.piles.B === 0 || s.piles.C >= c) && (s.piles.Bw === 0 || s.piles.Cw >= c) ? 'blocked' : 'ok';
     if (st === 'ramp') return s.piles.B + s.piles.Bw <= 0 ? 'starved' : 'ok';
     const idle = k => g.teams[k].every(t => t.state === 'wait');
@@ -439,6 +453,10 @@ function create(saved) {
     for (const t of g.teams.place.concat(g.teams.great)) if (t.loaded && t.state !== 'back') { if (t.mat === 'g') o.granite++; else if (t.mat === 'gold') o.gold++; else o.piles[t.mat === 'w' ? 'Cw' : 'C']++; }
     o.savedAt = Date.now();
     return o;
+  }
+  if (before3) {                                     // saves from before the fix: give what a fresh start gives now
+    if (s.workers < startWorkers()) s.workers = startWorkers();
+    if (project().river && s.placed === 0 && s.piles.Cw + s.piles.Bw === 0) { s.piles.Cw = 6; s.piles.Bw = 4; }
   }
   setSite(); syncTeams();
   return Object.assign(g, { step, click, buy, bury, setAssign, costs, capacity, status, snapshot, surfaceZ, done, workCourse, rampMid, rampEdge, cap, free, mult, globalMult, handMult, kaGain, project, teamsWanted, startWorkers, localStone, rampWanted, rampNeed: need, slope, nextNeed, startExp, canTake });

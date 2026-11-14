@@ -154,7 +154,7 @@ const HINTS = [
   ['team', s => s.racje >= 18 && s.placed >= 6, 'Sanie i układanie biorą ludzi czwórkami. Cztery wolne ręce to nowa ekipa.', 10],
   ['ramp', s => g.rampWanted() && s.assign.ramp === 0, 'Wyżej bez rampy nie wejdą. Przydziel ludzi do rampy: sypią ją z surowych bloków, a każda warstwa kosztuje więcej.', 14],
   ['low', s => s.east && s.quarryLeft < 160 && s.quarryLeft > 0 && (s.assign.equarry === 0 || s.assign.boat === 0), 'Miejscowa skała zaraz się skończy. Obsadź kamieniołom za rzeką i barki, zanim stanie cała budowa.', 14],
-  ['pyr', s => s.project === 'pyramid', 'Piramida chce białego kamienia na zewnątrz, żółtego w środku, granitu wokół komory i złotego czubka. Granit i złoto przywożą wyprawy, a każda zabiera ludzi na dłużej.', 18],
+  ['pyr', s => s.project === 'pyramid', 'Piramida zaczyna od białej okładziny, więc pierwsze bloki muszą przypłynąć zza rzeki. W środku idzie żółty kamień, wokół komory granit, na szczyt złoty czubek. Granit i złoto przywożą wyprawy.', 18],
   ['over', s => s.blocks >= 30 && !s.over.quarry, 'Odblokowany pierwszy nadzorca. Popędza stację za Ciebie i zostaje na zawsze, także po pochówku.', 12],
   ['great', s => s.workers >= 22 && s.great === 0, 'Masz już sporą załogę. Ekipa wysłana pod Wielką Piramidę nie zarabia racji, ale jej bloki zostają na zawsze i przyspieszają wszystko.', 14],
   ['bank', s => s.bank >= 600, 'Uzbierał się zapas czasu. Przyciski ×3 i ×10 na dole przyspieszają budowę, dopóki go starczy.', 12]
