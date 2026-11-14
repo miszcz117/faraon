@@ -6,14 +6,16 @@ const $ = id => document.getElementById(id);
 const SAVE_KEY = 'faraon.save.v1';
 let g = null;
 
-const NAMES = { quarry: 'Kamieniołom', haul: 'Sanie', mason: 'Kamieniarze', place: 'Układanie', great: 'Wielka Piramida' };
-const UNITS = { quarry: 'robotników', haul: 'ekip', mason: 'robotników', place: 'ekip', great: 'ekip' };
+const NAMES = { quarry: 'Kamieniołom', equarry: 'Kamieniołom za rzeką', boat: 'Barki', haul: 'Sanie', mason: 'Kamieniarze', ramp: 'Rampa', place: 'Układanie', great: 'Wielka Piramida' };
+const UNITS = { quarry: 'robotników', equarry: 'robotników', boat: 'załóg', haul: 'ekip', mason: 'robotników', ramp: 'robotników', place: 'ekip', great: 'ekip' };
 const TIPS = {
-  quarry: 'Wykuwają surowe bloki. Kliknięcie dokłada uderzeń.', haul: 'Ciągną surowe bloki na plac kamieniarzy. Ekipa to 4 ludzi i sanie.',
-  mason: 'Obrabiają surowe bloki na gładkie.', place: 'Wciągają gładkie bloki po rampie i układają grobowiec. Za każdy blok dostajesz racje.',
+  quarry: 'Wykuwają surowe bloki. Kamienia jest tu skończona ilość.', equarry: 'Wykuwają biały kamień na wschodnim brzegu. Trzeba go przewieźć barkami.',
+  boat: 'Barka bierze do 6 bloków naraz i wozi je przez rzekę. Załoga to 4 ludzi.', haul: 'Ciągną surowe bloki na plac kamieniarzy, z kamieniołomu albo z przystani. Ekipa to 4 ludzi i sanie.',
+  mason: 'Obrabiają surowe bloki na gładkie.', ramp: 'Sypią rampę z surowych bloków. Każda wyższa warstwa kosztuje więcej. Bez rampy ekipy nie wejdą wyżej.',
+  place: 'Wciągają gładkie bloki po rampie i układają grobowiec. Za każdy blok dostajesz racje.',
   great: 'Ciągną gładkie bloki pod Wielką Piramidę. Nie dają racji, ale zostają na zawsze i przyspieszają wszystko.'
 };
-const PILES = { A: 'surowe przy kamieniołomie', B: 'surowe na placu', C: 'obrobione' };
+const PILES = { A: 'surowe przy kamieniołomie', E: 'surowe za rzeką', W: 'surowe na przystani', B: 'surowe na placu', C: 'obrobione' };
 const KA_TEXT = { speed: ['Pamięć budowniczych', 'wszystko 1,5× szybciej'], crew: ['Liczniejsza załoga', '+5 robotników na start panowania'], racje: ['Hojniejszy skarbiec', 'racje za blok ×1,5'] };
 const ROMAN = n => { const r = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']]; let o = ''; for (const [v, s] of r) while (n >= v) { o += s; n -= v; } return o; };
 const fmt = n => String(Math.floor(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -33,11 +35,11 @@ function buildPanel() {
     el.innerHTML = `<div class="st-head"><b>${NAMES[st]}</b><span class="tag" data-f="over" hidden>nadzorca</span><span class="chip" data-f="chip"></span></div>
       <div class="st-body"><button type="button" class="hand" data-act="click">Popędź</button>
       <span class="cnt"><button type="button" data-act="minus" aria-label="Zabierz ludzi: ${NAMES[st]}">−</button><output data-f="n">0</output><button type="button" data-act="plus" aria-label="Dodaj ludzi: ${NAMES[st]}">+</button></span>
-      <span class="unit">${UNITS[st]}</span><span class="capv" data-f="cap"></span></div><div class="meter"><i data-f="meter"></i></div>`;
+      <span class="unit">${UNITS[st]}</span><span class="capv" data-f="cap"></span></div><div class="meter"><i data-f="meter"></i></div><small data-f="note" hidden></small>`;
     return el;
   };
   const pile = k => { const el = document.createElement('div'); el.className = 'pile'; el.dataset.pile = k; el.innerHTML = `<span>${PILES[k]}</span><div class="bar"><i></i></div><output></output>`; return el; };
-  chain.append(station('quarry'), pile('A'), station('haul'), pile('B'), station('mason'), pile('C'), station('place'), station('great'));
+  chain.append(station('quarry'), pile('A'), station('equarry'), pile('E'), station('boat'), pile('W'), station('haul'), pile('B'), station('ramp'), station('mason'), pile('C'), station('place'), station('great'));
   const shop = $('shop'); shop.textContent = '';
   const item = (buy, arg, label) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'buy'; b.dataset.buy = buy; if (arg) b.dataset.arg = arg; b.innerHTML = `<span class="lab">${label}</span><span class="sub"></span><span class="cost"></span>`; return b; };
   shop.append(item('worker', '', 'Najmij robotnika'));
@@ -49,7 +51,14 @@ function buildPanel() {
   for (const id in Sim.KA) ka.append(item('ka', id, KA_TEXT[id][0]));
 }
 const setText = (el, v) => { if (el.textContent !== v) el.textContent = v; };
-const CHIPS = { starved: 'czeka na bloki', blocked: 'stos pełny', empty: 'brak ludzi', done: 'gotowe' };
+const CHIPS = { starved: 'czeka na bloki', blocked: 'stos pełny', empty: 'brak ludzi', done: 'gotowe', out: 'wyczerpany', ready: 'sięga', ramp: 'czeka na rampę' };
+/* Which stations and piles exist right now: the river chain appears when stone is found there, the local one goes when it is spent. */
+function shown(key) {
+  const s = g.s;
+  if (key === 'equarry' || key === 'boat' || key === 'E' || key === 'W') return s.east;
+  if (key === 'quarry' || key === 'A') return s.quarryLeft > 0 || s.piles.A > 0;
+  return true;
+}
 
 function updateUi() {
   const s = g.s, st0 = g.site, cap = g.cap();
@@ -61,21 +70,32 @@ function updateUi() {
   setText($('tombRate'), g.done() ? 'Grobowiec gotowy. Czas pochować faraona.' : g.rate > 0 ? `${fmt1(g.rate * 60)} bloku na minutę` : 'pierwsze bloki w drodze');
   $('buryBtn').hidden = !g.done();
   // which station limits the chain
-  let bn = null, low = Infinity;
-  for (const st of ['quarry', 'haul', 'mason', 'place']) { const c = g.capacity(st); if (c < low) { low = c; bn = st; } }
+  const local = g.localStone() ? g.capacity('quarry') : 0, cands = [];
+  if (local > 0 && !(s.east && s.assign.equarry > 0 && s.assign.boat > 0)) cands.push(['quarry', local]);
+  if (s.east && (local === 0 || s.assign.equarry > 0 || s.assign.boat > 0)) cands.push(['equarry', local + g.capacity('equarry')], ['boat', local + g.capacity('boat')]);
+  cands.push(['haul', g.capacity('haul')], ['mason', g.capacity('mason')], ['place', g.capacity('place')]);
+  let bn = null, low = Infinity; for (const [st, c] of cands) if (c < low) { low = c; bn = st; }
   for (const el of document.querySelectorAll('.st')) {
     const st = el.dataset.st, u = Sim.UNIT[st], status = g.status(st);
+    el.hidden = !shown(st); if (el.hidden) continue;
     setText(el.querySelector('[data-f=n]'), String(s.assign[st] / u));
-    setText(el.querySelector('[data-f=cap]'), s.assign[st] >= u ? `${fmt1(g.capacity(st))}/min` : '');
+    setText(el.querySelector('[data-f=cap]'), s.assign[st] >= u && status !== 'out' && status !== 'ready' ? `${fmt1(g.capacity(st))}/min` : '');
     const chip = el.querySelector('[data-f=chip]'), txt = CHIPS[status] || (st === bn && !g.done() ? 'wąskie gardło' : '');
-    setText(chip, txt); chip.className = 'chip' + (status === 'blocked' ? ' warn' : status === 'starved' || status === 'empty' ? ' dim' : txt ? ' hot' : '');
+    setText(chip, txt); chip.className = 'chip' + (status === 'blocked' || status === 'ramp' || status === 'out' ? ' warn' : status === 'starved' || status === 'empty' || status === 'ready' ? ' dim' : txt ? ' hot' : '');
     el.querySelector('[data-f=over]').hidden = !s.over[st];
-    el.querySelector('[data-act=plus]').disabled = g.free() < u;
+    el.querySelector('[data-act=plus]').disabled = g.free() < u || status === 'out';
     el.querySelector('[data-act=minus]').disabled = s.assign[st] < u;
-    el.classList.toggle('boost', st !== 'quarry' && st !== 'mason' && g.boost[st] > 0);
-    el.querySelector('[data-f=meter]').style.width = (100 * clamp(st === 'quarry' ? s.wq : st === 'mason' ? s.wm : g.boost[st] / Sim.BASE.boostMax, 0, 1)).toFixed(0) + '%';
+    const team = st === 'haul' || st === 'place' || st === 'great' || st === 'boat';
+    el.classList.toggle('boost', team && g.boost[st] > 0);
+    const m = st === 'quarry' ? s.wq : st === 'equarry' ? s.we : st === 'mason' ? s.wm : st === 'ramp' ? s.wr : g.boost[st] / Sim.BASE.boostMax;
+    el.querySelector('[data-f=meter]').style.width = (100 * clamp(m, 0, 1)).toFixed(0) + '%';
+    const note = el.querySelector('[data-f=note]');
+    const text = st === 'quarry' ? (s.quarryLeft > 0 ? `w skale zostało ${fmt(s.quarryLeft)} bloków` : 'skała wybrana do końca')
+      : st === 'ramp' && g.rampWanted() ? `do warstwy ${s.rampK + 2}: ${s.rampFill} / ${g.rampNeed(s.rampK + 1)} surowych bloków` : '';
+    note.hidden = !text; setText(note, text);
   }
   for (const el of document.querySelectorAll('.pile')) {
+    el.hidden = !shown(el.dataset.pile); if (el.hidden) continue;
     const n = s.piles[el.dataset.pile];
     el.querySelector('i').style.width = (100 * n / cap) + '%'; setText(el.querySelector('output'), `${n}/${cap}`);
     el.classList.toggle('full', n >= cap); el.classList.toggle('empty', n === 0);
@@ -83,11 +103,11 @@ function updateUi() {
   for (const b of document.querySelectorAll('.buy[data-buy]')) {
     const kind = b.dataset.buy, arg = b.dataset.arg; let cost = 0, sub = '', cur = s.racje, off = false, hide = false, unit = '';
     if (kind === 'worker') { cost = g.costs.worker(); sub = `masz ${s.workers}`; }
-    else if (kind === 'tool') { cost = g.costs.tool(arg); sub = `poziom ${s.lvl[arg]} → ${s.lvl[arg] + 1}, +25%`; }
+    else if (kind === 'tool') { cost = g.costs.tool(arg); sub = `poziom ${s.lvl[arg]} → ${s.lvl[arg] + 1}, +25%`; hide = !shown(arg); }
     else if (kind === 'pile') { cost = g.costs.pile(); sub = `${cap} → ${cap + 4} bloków`; }
     else if (kind === 'hand') { cost = g.costs.hand(); sub = `popędzanie ×1,5 (poziom ${s.lvl.hand})`; }
     else if (kind === 'overseer') {
-      const o = Sim.OVERSEERS[arg]; cost = o.cost;
+      const o = Sim.OVERSEERS[arg]; cost = o.cost; hide = !shown(arg) && !s.over[arg];
       if (s.over[arg]) { sub = 'pracuje, popędza za Ciebie'; off = true; cost = -1; }
       else if (s.blocks < o.need) { sub = `po ${o.need} ułożonych blokach (masz ${fmt(s.blocks)})`; off = true; }
       else sub = 'popędza stację sam, zostaje na zawsze';
@@ -103,6 +123,7 @@ function updateUi() {
   setText($('greatBonus'), `+${Math.round((2 * Math.sqrt(s.great)))}% do tempa wszystkiego`);
   // time bank
   setText($('bankVal'), fmtTime(s.bank));
+  $('viewRiver').hidden = !s.east;
   for (const b of document.querySelectorAll('[data-warp]')) { const w = Number(b.dataset.warp); b.setAttribute('aria-pressed', String(w === warp)); b.disabled = w > 1 && s.bank < 2; }
 }
 
@@ -113,6 +134,8 @@ const HINTS = [
   ['first', s => s.placed >= 1, 'Pierwszy blok leży. Każdy ułożony blok to racje, wyższe warstwy płacą lepiej.', 8],
   ['full', s => s.placed >= 3 && Object.values(s.piles).some(n => n >= g.cap()), 'Stos pełny: stacja przed nim stoi i marnuje ludzi. Wzmocnij stację za nim albo przesuń tam robotników.', 12],
   ['team', s => s.racje >= 18 && s.placed >= 6, 'Sanie i układanie biorą ludzi czwórkami. Cztery wolne ręce to nowa ekipa.', 10],
+  ['ramp', s => g.rampWanted() && s.assign.ramp === 0, 'Wyżej bez rampy nie wejdą. Przydziel ludzi do rampy: sypią ją z surowych bloków, a każda warstwa kosztuje więcej.', 14],
+  ['low', s => s.east && s.quarryLeft < 160 && s.quarryLeft > 0 && (s.assign.equarry === 0 || s.assign.boat === 0), 'Miejscowa skała zaraz się skończy. Obsadź kamieniołom za rzeką i barki, zanim stanie cała budowa.', 14],
   ['over', s => s.blocks >= 30 && !s.over.quarry, 'Odblokowany pierwszy nadzorca. Popędza stację za Ciebie i zostaje na zawsze, także po pochówku.', 12],
   ['great', s => s.workers >= 22 && s.great === 0, 'Masz już sporą załogę. Ekipa wysłana pod Wielką Piramidę nie zarabia racji, ale jej bloki zostają na zawsze i przyspieszają wszystko.', 14],
   ['bank', s => s.bank >= 600, 'Uzbierał się zapas czasu. Przyciski ×3 i ×10 na dole przyspieszają budowę, dopóki go starczy.', 12]
@@ -252,7 +275,10 @@ function frame(now) {
   for (const ev of g.events) {
     if (ev.type === 'placed') Scene.pop(ev.x, ev.y, ev.z, `+${fmt1(ev.pay).replace(',0', '')}`);
     else if (ev.type === 'great') { Scene.pop(ev.x, ev.y, ev.z, 'Wielka +1', '#EDBE45'); if (g.s.great === 1) toast('Pierwszy blok Wielkiej Piramidy leży. Zostało 72 180 099.', 8); }
-    else if (ev.type === 'course') toast(`Warstwa ${ev.k} gotowa. Rampa idzie w górę.`);
+    else if (ev.type === 'course') toast(g.rampWanted() ? `Warstwa ${ev.k} gotowa. Teraz rampa musi sięgnąć wyżej.` : `Warstwa ${ev.k} gotowa.`);
+    else if (ev.type === 'ramp') toast(`Rampa sięga warstwy ${ev.k + 1}.`);
+    else if (ev.type === 'east') { toast('Zwiadowcy znaleźli biały kamień za rzeką. Miejscowej skały ubyła połowa: obsadź kamieniołom za rzeką i barki. Widok „Rzeka” pokaże przystań.', 16); save(true); }
+    else if (ev.type === 'quarryOut') toast('Miejscowy kamieniołom jest wybrany do końca. Od teraz cały kamień płynie zza rzeki.', 12);
     else if (ev.type === 'done') { toast('Grobowiec gotowy.'); save(true); openBurial(); }
     else if (ev.type === 'reign') { Scene.rebuild(); flyTo(Scene.views.site(), 2); }
   }

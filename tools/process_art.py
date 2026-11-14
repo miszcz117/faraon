@@ -19,6 +19,7 @@ SPRITES = {
     'palm_a': ('tree', 420), 'palm_b': ('tree', 380), 'palm_c': ('tree', 420), 'reeds': ('tree', 220),
     'house_a': ('building', 420), 'house_b': ('building', 520), 'hut': ('building', 440),
     'granary': ('building', 520), 'workshop': ('building', 460), 'boat': ('flat', 420),
+    'barge_e': ('barge', 460), 'barge_w': ('barge', 460),
 }
 # name: (tile px, low-res px or None, target mean colour or None, strength of the tint)
 TEXTURES = {
@@ -56,6 +57,7 @@ for name, (kind, size) in SPRITES.items():
         bx = float(np.median(np.where(a[int(y1 - im.height * 0.02):y1 + 1].any(axis=0))[0]))
         im = im.resize((round(im.width * k), round(im.height * k)), Image.LANCZOS)
         if kind == 'tree': meta[name] = dict(w=im.width, h=im.height, ax=round(bx * k, 1), ay=im.height - 2)
+        elif kind == 'barge': meta[name] = dict(w=im.width, h=im.height, ax=round(im.width / 2, 1), ay=round(im.height * 0.56, 1))
         else: meta[name] = dict(w=im.width, h=im.height, ax=round(im.width / 2, 1), ay=round(im.height * 0.78, 1))
     im.save(f'{OUT}/{name}.webp', quality=88, method=6)
 

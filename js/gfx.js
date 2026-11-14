@@ -48,7 +48,8 @@ const SPR = {
   palm_c: { w: 418, h: 420, ax: 200, ay: 418 }, reeds: { w: 222, h: 220, ax: 110, ay: 218 },
   house_a: { w: 420, h: 430, ax: 209.6, ay: 421.2 }, house_b: { w: 520, h: 510, ax: 263.8, ay: 507.3 },
   hut: { w: 440, h: 545, ax: 170.8, ay: 495.4 }, granary: { w: 520, h: 464, ax: 262.5, ay: 419.5 },
-  workshop: { w: 460, h: 509, ax: 232.7, ay: 489.6 }, boat: { w: 420, h: 416, ax: 210, ay: 324.5 }
+  workshop: { w: 460, h: 509, ax: 232.7, ay: 489.6 }, boat: { w: 420, h: 416, ax: 210, ay: 324.5 },
+  barge_e: { w: 460, h: 460, ax: 226, ay: 222 }, barge_w: { w: 460, h: 456, ax: 232, ay: 230, vs: 0.76 }   // vs: squash to the game's 2:1 projection
 };
 // units = how many world units one repeat of the texture covers
 const TEX = { sand: { units: 26 }, water: { units: 22 }, grass: { units: 14 }, crops: { units: 6 }, wheat: { units: 6 }, stone: { units: 5 }, strata: { units: 9 }, earth: { units: 8 } };
@@ -214,10 +215,10 @@ function worker(x, y, z, o) {
   ctx.restore();
 }
 function spriteAt(m, sx, sy, s, alpha) {
-  const x = sx - m.ax * s, y = sy - m.ay * s;
-  if (x > V.W || y > V.H || x + m.w * s < 0 || y + m.h * s < 0) return;
-  if (alpha !== undefined && alpha < 1) { ctx.globalAlpha = alpha; ctx.drawImage(m.img, x, y, m.w * s, m.h * s); ctx.globalAlpha = 1; }
-  else ctx.drawImage(m.img, x, y, m.w * s, m.h * s);
+  const v = s * (m.vs || 1), x = sx - m.ax * s, y = sy - m.ay * v;
+  if (x > V.W || y > V.H || x + m.w * s < 0 || y + m.h * v < 0) return;
+  if (alpha !== undefined && alpha < 1) { ctx.globalAlpha = alpha; ctx.drawImage(m.img, x, y, m.w * s, m.h * v); ctx.globalAlpha = 1; }
+  else ctx.drawImage(m.img, x, y, m.w * s, m.h * v);
 }
 function groundShadow(x0, y0, x1, y1, h, tx0, ty0, tx1, ty1) {   // light travels toward (+0.8,-0.35) per unit height
   const ox = 0.8 * h, oy = -0.35 * h;
