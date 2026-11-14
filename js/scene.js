@@ -1,7 +1,7 @@
 /* Faraon: the diorama. Lays out the valley, draws it back to front, and answers "what did the player click". */
 (function () {
 'use strict';
-const { BH, ZK, cam, V, ctx, P, visBox, clamp, lerp, hsh, C, INK, SPR, box, texPoly, fillPoly, path, line, inkW, matGround, matFaceY, texLevel, SH_R, spriteAt, worker, drawGhost, drawStruct, groundShadow } = G;
+const { BH, ZK, cam, V, ctx, P, visBox, clamp, lerp, hsh, C, INK, SPR, box, texPoly, fillPoly, path, line, inkW, matGround, matFaceY, texLevel, SH_R, spriteAt, worker, drawGhost, drawStruct, capstone, groundShadow } = G;
 const L = Sim.L, GN = L.greatN;
 let g = null, statics = [], booted = false;
 const world = [], add = o => { world.push(o); return o; };
@@ -52,7 +52,7 @@ function rockBench(o) {
 }
 function drawRamp() {
   const zt = g.rampZ; if (zt < 0.01) return;
-  const e = g.rampEdge(), len = zt * L.rampSlope, X = L.eastX, x2 = X + len, mid = g.rampMid(), y0 = mid - L.rampHalf, y1 = mid + L.rampHalf;
+  const e = g.rampEdge(), len = zt * g.slope(), X = L.eastX, x2 = X + len, mid = g.rampMid(), y0 = mid - L.rampHalf, y1 = mid + L.rampHalf;
   const fL = [P(e, y1, zt), P(X, y1, zt), P(x2, y1, 0), P(e, y1, 0)], fT = [P(e, y0, zt), P(X, y0, zt), P(X, y1, zt), P(e, y1, zt)], fS = [P(X, y0, zt), P(x2, y0, 0), P(x2, y1, 0), P(X, y1, zt)];
   if (texLevel('earth')) {
     texPoly(fL, 'earth', matFaceY(y1)); fillPoly(fL, SH_R);
@@ -74,6 +74,7 @@ const benches = [
   { x: 19, y: -49, w: 20, d: 4, h: 2.6 }, { x: 19, y: -45, w: 17, d: 3.4, h: 1.3, cuts: true }, { x: 39, y: -49, w: 5, d: 3, h: 1.9 }
 ];
 const EAST = [{ x: 134, y: -41, w: 27, d: 9, h: 7.5 }, { x: 134, y: -32, w: 23, d: 6, h: 4.6 }, { x: 136, y: -26, w: 17, d: 4.6, h: 2.2, cuts: true }];
+const YARD = { Bw: [30.2, -12], Cw: [30.2, -3.6], G: [38.2, -3.6] };     // white stone gets its own piles beside the local ones
 const JETTY_W = { x: 91.4, y: -14.2, w: 6.6, d: 3.2 }, JETTY_E = { x: 127.4, y: -14.2, w: 6, d: 3.2 };
 /* The local quarry is eaten away bench by bench, front to back, as its blocks are taken. */
 const EAT_ORDER = [4, 5, 3, 2, 1, 0], benchVol = benches.map(b => b.w * b.d * b.h), volTotal = benchVol.reduce((a, b) => a + b, 0);
@@ -106,7 +107,11 @@ function buildWorld() {
   for (const b of EAST) add({ x0: b.x, y0: b.y, x1: b.x + b.w, y1: b.y + b.d, h: b.h, shadow: true, draw() { rockBench(b); } });
   for (const j of [JETTY_W, JETTY_E]) add({ x0: j.x, y0: j.y, x1: j.x + j.w, y1: j.y + j.d, draw() { if (g.s.east) box(j.x, j.y, 0, j.w, j.d, 0.5, C.wood, cam.T >= 6 ? 2 : 0); } });
   const epile = (p, key) => add({ x0: p[0], y0: p[1], x1: p[0] + 3.3, y1: p[1] + 3.3, draw() { if (g.s.east) pileBlocks(p[0], p[1], g.s.piles[key], C.stone, 'stone'); } });
-  epile(L.pileE, 'E'); epile(L.pileW, 'W');
+  epile(L.pileE, 'E'); epile(L.pileW, 'W'); epile(YARD.Bw, 'Bw'); epile(YARD.Cw, 'Cw');
+  add({ x0: YARD.G[0], y0: YARD.G[1], x1: YARD.G[0] + 3.3, y1: YARD.G[1] + 3.3, draw() {                     // granite, and the capstone waiting its turn
+    pileBlocks(YARD.G[0], YARD.G[1], g.s.granite, C.granite);
+    if (g.s.gold > 0) capstone(YARD.G[0] + 1.1, YARD.G[1] + 3.6, 0, 1);
+  } });
   const pile = (p, key, col, tex) => add({ x0: p[0], y0: p[1], x1: p[0] + 3.3, y1: p[1] + 3.3, draw() { pileBlocks(p[0], p[1], g.s.piles[key], col, tex); } });
   pile(L.pileA, 'A', C.raw, 'strata'); pile(L.pileB, 'B', C.raw, 'strata'); pile(L.pileC, 'C', C.stone, 'stone');
   addHouse('workshop', 41.5, -9.6);
@@ -163,12 +168,12 @@ function sortStatics(list) {
 function rebuild() {
   const dyn = [];
   for (const t of g.s.tombs) {
-    const st = Sim.mkStruct(t.ox, t.oy, t.a, t.b, t.n), top = st.courses[st.n - 1];
+    const st = Sim.mkStruct(t.ox, t.oy, t.a, t.b, t.n, 0, (Sim.PROJECTS.find(p => p.id === t.id) || {}).kind), top = st.courses[st.n - 1];
     dyn.push({ x0: t.ox, y0: t.oy, x1: t.ox + t.a, y1: t.oy + t.b, h: t.n * BH, shadow: true, top: [top.x0, top.y0, top.x0 + top.a, top.y0 + top.b], draw() { drawStruct(st, st.total); } });
   }
   const st = g.site, mid = g.rampMid();
   const sSite = { x0: st.ox, y0: st.oy, x1: st.ox + st.a, y1: st.oy + st.b, draw() { if (!g.done()) drawGhost(st, false); drawStruct(st, g.s.placed, g.flash.place); } };
-  const sRamp = { x0: L.eastX - st.n / 2 - 0.5, y0: mid - L.rampHalf, x1: L.eastX + (st.n - 1) * BH * L.rampSlope, y1: mid + L.rampHalf, after: [sSite], draw: drawRamp };
+  const sRamp = { x0: L.eastX - st.n / 2 - 0.5, y0: mid - L.rampHalf, x1: L.eastX + (st.n - 1) * BH * g.slope(), y1: mid + L.rampHalf, after: [sSite], draw: drawRamp };
   statics = sortStatics(world.concat(dyn, [sSite, sRamp]));
 }
 
@@ -185,7 +190,7 @@ function roads() {
   const mid = g.rampMid();
   return [
     { pts: [[33.6, -35.8], [32.6, -26], [35, -18], [35.6, -13.4], [35.6, -2]], half: 2.3, ruts: true },
-    { pts: [[35.6, -1], [34.4, 2.6], [31, mid], [L.eastX + 0.5, mid]], half: 1.9, ruts: true },
+    { pts: [[35.6, -1], [34.4, 2.6], [Math.max(31, L.eastX + (g.site.n - 1) * BH * g.slope() + 3), mid], [L.eastX + 0.5, mid]], half: 1.9, ruts: true },
     { pts: [[33, -4.6]].concat(L.greatRoad, [[-90, 24.4]]), half: 1.6 },
     { pts: [[38, 3], [46, 4], [52, 6]], half: 1.5 }
   ].concat(g.s.east ? [{ pts: [[91.6, -12.6]].concat(L.harborRoad.slice(1)), half: 1.9, ruts: true }] : []);
@@ -235,6 +240,16 @@ function drawGround(now) {
     else band(y => nileL(y) + 9, y => nileR(y) - 9, C.waterD);
     ctx.strokeStyle = 'rgba(74,46,22,0.4)'; ctx.lineWidth = inkW();
     for (const f of [nileL, nileR]) { ctx.beginPath(); ys.forEach((y, i) => { const p = P(f(y), y); i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); }); ctx.stroke(); }
+    for (const id in Sim.EXPEDITIONS) {                                // an expedition sails off south, and later comes back loaded
+      const e = Sim.EXPEDITIONS[id], left = g.s.exp[id]; if (!(left > 0)) continue;
+      const gone = e.time - left, lane = id === 'aswan' ? 13 : 19;
+      if (gone < 30 && SPR.boat.ok) { const y = -8 + gone * 3, q = P(nileL(y) + lane, y); spriteAt(SPR.boat, q[0], q[1], 8.5 * cam.T / SPR.boat.w); }
+      else if (left < 30) {
+        const y = -8 + left * 3, x = nileL(y) + lane, q = P(x, y), m = SPR.barge_n;
+        if (m.ok) spriteAt(m, q[0], q[1], 7.25 * cam.T / 445);
+        if (id === 'aswan') for (let c = 0; c < 4; c++) box(x - 0.5 + (c < 2 ? -0.6 : 0.6), y - 0.5 + ((c % 2) - 0.5) * 1.3, 0.5, 1, 1, BH, C.granite, cam.T >= 9 ? 2 : 1); else capstone(x - 0.5, y - 0.5, 0.5, 1);
+      }
+    }
     for (let b = 0; b < 3; b++) {                                     // river boats, drifting downstream
       const y = ((now * 0.0016 * (1 + b * 0.35) + b * 170) % 520 + 520) % 520 - 260, [sx, sy] = P(nileL(y) + 11 + b * 8, y);
       if (cam.T >= 1.5 && SPR.boat.ok && sx > -200 && sx < V.W + 200 && sy > -200 && sy < V.H + 200) spriteAt(SPR.boat, sx, sy, 8.5 * cam.T / SPR.boat.w);
@@ -282,9 +297,17 @@ function drawGround(now) {
 
 /* ---------- people and sledges: collected every frame, slotted between the statics ---------- */
 const EAST_SPOTS = []; for (let x = 137; x < 152.5; x += 1.6) EAST_SPOTS.push([x, -20.7, 0]); for (let x = 135.5; x < 156; x += 1.7) EAST_SPOTS.push([x, -27.1, 2.2 * 0]);
-const MASON_SPOTS = [[33.4, -6.2], [36, -6.2], [38.6, -6.2], [30.8, -6.2], [28.2, -6.4], [30.8, -9.4], [28.2, -9.6], [25.6, -6.3], [25.6, -9.5], [23, -6.4], [23, -9.6], [28.2, -12.6], [25.6, -12.7], [30.8, -12.5]];
+const MASON_SPOTS = [[33.4, -6.2], [36, -6.2], [38.6, -6.2], [30.8, -6.2], [28.2, -6.4], [28.2, -9.6], [25.6, -6.3], [25.6, -9.5], [23, -6.4], [23, -9.6], [28.2, -12.6], [25.6, -12.7], [20.4, -6.4], [20.4, -9.6]];
 const IDLE_SPOTS = [[42.5, 4.6], [43.9, 5.6], [45.2, 4.4], [44.3, 3.2], [46.4, 5.8], [42.9, 6.8], [47.2, 3.6], [45.6, 7], [48.3, 5.1], [41.4, 5.8], [44, 8], [46.8, 8.2]];
 const faceOf = d => (d[0] - d[1]) >= 0 ? 1 : -1;
+/* The block a crew is carrying, drawn as the stone it is. */
+function cargo(tm, x, y, z, raw) {
+  const st = cam.T >= 9 ? 2 : 1;
+  if (tm.mat === 'gold') capstone(x, y, z, 1);
+  else if (tm.mat === 'g') box(x, y, z, 1, 1, BH, C.granite, st);
+  else if (raw) box(x, y, z, 1, 1, BH, C.raw, st, 'strata');
+  else { box(x, y, z, 1, 1, BH, C.stone, st, 'stone'); if (tm.mat === 'l' && g.s.east) G.fillPoly([P(x, y, z + BH), P(x + 1, y, z + BH), P(x + 1, y + 1, z + BH), P(x, y + 1, z + BH)], 'rgba(204,156,74,0.5)'); }
+}
 function collectMovers() {
   const items = [], s = g.s, t = s.t, capP = g.cap();
   const pulse = st => (s.t - (g.handPulse[st] ?? -9)) < 0.5 ? 2 : 1;
@@ -304,14 +327,14 @@ function collectMovers() {
       } });
     }
   }
-  const rBusy = g.rampWanted() && s.piles.B > 0, rMid = g.rampMid();
+  const rBusy = g.rampWanted() && s.piles.B + s.piles.Bw > 0, rMid = g.rampMid();
   for (let i = 0; i < Math.min(s.assign.ramp, 10); i++) {            // ramp builders along the foot of the ramp
     const x = L.eastX + 1.2 + i * 1.5, y = rMid + L.rampHalf + 0.8;
     items.push({ x, y, draw() { worker(x, y, 0, { face: -1, anim: rBusy ? 'carve' : 'idle', ph: t * 6 * pulse('ramp') + i * 1.7 }); } });
   }
-  const mBusy = s.piles.B > 0 && s.piles.C < capP;
+  const mBusy = (s.piles.B > 0 && s.piles.C < capP) || (s.piles.Bw > 0 && s.piles.Cw < capP);
   MASON_SPOTS.slice(0, s.assign.mason).forEach(([x, y], i) => {
-    if (mBusy || (i === 0 && s.wm > 0.02)) items.push({ x, y, draw() { box(x - 0.5, y - 0.5, 0, 1, 1, BH, C.raw, cam.T >= 9 ? 2 : 1, i === 0 && s.wm > 0.6 ? 'stone' : 'strata'); } });
+    if (mBusy || (i === 0 && s.wm > 0.02)) items.push({ x, y, draw() { box(x - 0.5, y - 0.5, 0, 1, 1, BH, C.raw, cam.T >= 9 ? 2 : 1, s.piles.B === 0 || (i === 0 && s.wm > 0.6) ? 'stone' : 'strata'); } });
     items.push({ x: x + 0.2, y: y + 1, draw() { worker(x - 0.1, y + 0.95, 0, { face: 1, anim: mBusy ? 'carve' : 'idle', ph: t * 6 * pulse('mason') + i * 2.1 }); } });
   });
   IDLE_SPOTS.slice(0, g.free()).forEach(([x, y], i) => items.push({ x, y, draw() { worker(x, y, 0, { face: i % 2 ? 1 : -1, anim: 'idle', ph: 0 }); } }));
@@ -323,11 +346,11 @@ function collectMovers() {
       let px, py;
       if (!moving) { px = tm.x + sd * 2.2; py = tm.y + (r ? 1.1 : -1.1); }
       else { const ahead = 1.5 + r * 0.95; px = tm.x + d[0] * ahead - d[1] * sd; py = tm.y + d[1] * ahead + d[0] * sd; }
-      pull.push([px, py, g.surfaceZ(px, py)]);
+      const pz = g.surfaceZ(px, py); pull.push([px, py, pz < z - 0.7 ? z : pz]);
     }
     items.push({ x: tm.x, y: tm.y, draw() {
       box(tm.x - 0.8, tm.y - 0.5, z, 1.6, 1.0, 0.14, C.wood, cam.T >= 9 ? 2 : 0);
-      if (tm.loaded && !placing) box(tm.x - 0.5, tm.y - 0.5, z + 0.14, 1, 1, BH, raw ? C.raw : C.stone, cam.T >= 9 ? 2 : 1, raw ? 'strata' : 'stone');
+      if (tm.loaded && !placing) cargo(tm, tm.x - 0.5, tm.y - 0.5, z + 0.14, raw);
       if (moving && cam.T >= 7) {
         ctx.strokeStyle = '#7A5A32'; ctx.lineWidth = clamp(cam.T * 0.03, 0.6, 1.4);
         const f = P(tm.x + d[0] * 0.8, tm.y + d[1] * 0.8, z + 0.2); for (const p of pull) line(f, P(p[0], p[1], p[2] + 0.75));
@@ -340,7 +363,7 @@ function collectMovers() {
     if (placing) {                                                    // the block slides off the sledge into its place
       const k = clamp(tm.t / Sim.BASE.placeTime, 0, 1), e = k * k * (3 - 2 * k), tg = tm.target;
       const bx = lerp(tm.from[0], tg.x, e), by = lerp(tm.from[1], tg.y, e), bz = lerp(g.surfaceZ(tm.from[0], tm.from[1]) + 0.14, tg.z, e);
-      items.push({ x: bx, y: by, draw() { box(bx - 0.5, by - 0.5, bz, 1, 1, BH, C.stone, 2, 'stone'); } });
+      items.push({ x: bx, y: by, draw() { cargo(tm, bx - 0.5, by - 0.5, bz, false); } });
     }
   }
   for (const it of items) {                    // draw just before the first static this mover stands behind
@@ -427,8 +450,8 @@ function hit(sx, sy) {
     if (inBox(zoneBox(134, -41, 161, -19.5, 7.5), sx, sy)) return 'equarry';
   }
   const st = g.site;
-  if (g.rampWanted() && inBox(zoneBox(L.eastX, g.rampMid() - L.rampHalf - 1.6, L.eastX + Math.max(6, g.rampZ * L.rampSlope) + 1, g.rampMid() + L.rampHalf + 1.6, g.rampZ + 1), sx, sy)) return 'ramp';
-  if (inBox(zoneBox(st.ox - 1, st.oy - 1, L.eastX + g.rampZ * L.rampSlope + 1, st.oy + st.b + 1, st.n * BH + 1), sx, sy)) return 'place';
+  if (g.rampWanted() && inBox(zoneBox(L.eastX, g.rampMid() - L.rampHalf - 1.6, L.eastX + Math.max(6, g.rampZ * g.slope()) + 1, g.rampMid() + L.rampHalf + 1.6, g.rampZ + 1), sx, sy)) return 'ramp';
+  if (inBox(zoneBox(st.ox - 1, st.oy - 1, L.eastX + g.rampZ * g.slope() + 1, st.oy + st.b + 1, st.n * BH + 1), sx, sy)) return 'place';
   if (inBox(zoneBox(21.5, -14, 40.5, -4.6, 1.6), sx, sy)) return 'mason';
   if (g.s.quarryLeft > 0 && inBox(zoneBox(12, -62, 44, -39.8, 7), sx, sy)) return 'quarry';
   if (inBox(zoneBox(29.5, -35, 39, -13, 0.5), sx, sy) || (g.s.east && inBox(zoneBox(40, -14.6, 90, -10.6, 0.5), sx, sy))) return 'haul';

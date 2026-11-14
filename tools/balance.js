@@ -16,6 +16,13 @@ function think() {
     if (s.assign.ramp < 2) { if (s.racje >= g.costs.worker()) g.buy('worker'); else for (const st of ['mason', 'quarry', 'equarry']) if (s.assign[st] > 1 && g.setAssign(st, -1)) { g.setAssign('ramp', 1); break; } }
   }
   else while (s.assign.ramp > 0) g.setAssign('ramp', -1);
+  // expeditions: when the wall will soon ask for granite or gold, free a crew and send it
+  const nn = g.nextNeed();
+  if (nn && nn.special && nn.inBlocks < 150) {
+    const id = nn.special === 'g' ? 'aswan' : 'nubia', e = Sim.EXPEDITIONS[id];
+    if (s.exp[id] === 0 && s.racje >= e.cost) { for (let k = 0; k < 6 && g.free() < e.crew; k++) for (const st of ['place', 'haul', 'equarry', 'mason']) if (g.free() < e.crew && s.assign[st] > Sim.UNIT[st]) g.setAssign(st, -1); g.startExp(id); }
+    if (s.exp[id] === 0 && s.racje < e.cost) return;                 // save up for it
+  }
   for (let n = 0; n < 20; n++) {
     const bn = bottleneck(), unit = Sim.UNIT[bn];
     if (g.free() >= unit) { g.setAssign(bn, 1); continue; }
@@ -35,7 +42,7 @@ for (let r = 0; r < reigns; r++) {
   while (!g.done() && s.t - t0 < 60 * 3600) {
     g.step(dt);
     if (s.placed !== lastP) { lastP = s.placed; lastT = s.t; }
-    if (s.t - lastT > 3600) { console.log('  STALL placed', s.placed, 'rampK', s.rampK, 'fill', s.rampFill, 'kc', g.workCourse(), 'piles', JSON.stringify(s.piles), 'racje', Math.round(s.racje), 'free', g.free(), Sim.STATIONS.map(st => st + ':' + g.status(st)).join(' '), 'haul', g.teams.haul.map(t => t.base + '/' + t.state).join(','), 'boat', g.teams.boat.map(t => t.state + t.cargo).join(',')); break; }
+    if (s.t - lastT > 3600) { console.log('  STALL placed', s.placed, 'need', JSON.stringify(g.nextNeed()), 'granite', s.granite, 'gold', s.gold, 'exp', JSON.stringify(s.exp), 'rampK', s.rampK, 'fill', s.rampFill, 'kc', g.workCourse(), 'piles', JSON.stringify(s.piles), 'racje', Math.round(s.racje), 'free', g.free(), Sim.STATIONS.map(st => st + ':' + g.status(st)).join(' '), 'haul', g.teams.haul.map(t => t.base + '/' + t.state).join(','), 'boat', g.teams.boat.map(t => t.state + t.cargo).join(',')); break; }
     clickAcc += cps * dt; while (clickAcc >= 1) { clickAcc--; g.click(bottleneck()); }
     if (Math.floor(s.t * 10) % 20 === 0) think();
     g.events.length = 0;

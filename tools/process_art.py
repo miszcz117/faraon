@@ -19,7 +19,7 @@ SPRITES = {
     'palm_a': ('tree', 420), 'palm_b': ('tree', 380), 'palm_c': ('tree', 420), 'reeds': ('tree', 220),
     'house_a': ('building', 420), 'house_b': ('building', 520), 'hut': ('building', 440),
     'granary': ('building', 520), 'workshop': ('building', 460), 'boat': ('flat', 420),
-    'barge_e': ('barge', 460), 'barge_w': ('barge', 460),
+    'barge_e': ('barge', 460), 'barge_w': ('barge', 460), 'barge_n': ('barge', 460),
 }
 # name: (tile px, low-res px or None, target mean colour or None, strength of the tint)
 TEXTURES = {

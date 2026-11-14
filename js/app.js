@@ -15,7 +15,9 @@ const TIPS = {
   place: 'Wciągają gładkie bloki po rampie i układają grobowiec. Za każdy blok dostajesz racje.',
   great: 'Ciągną gładkie bloki pod Wielką Piramidę. Nie dają racji, ale zostają na zawsze i przyspieszają wszystko.'
 };
-const PILES = { A: 'surowe przy kamieniołomie', E: 'surowe za rzeką', W: 'surowe na przystani', B: 'surowe na placu', C: 'obrobione' };
+const PILES = { A: 'surowe przy kamieniołomie', E: 'surowe za rzeką', W: 'surowe na przystani', B: 'surowe na placu', Bw: 'surowe białe na placu', C: 'obrobione', Cw: 'obrobione białe' };
+const EXP_TEXT = { aswan: ['Wyprawa do Asuanu', 'granit'], nubia: ['Wyprawa do Nubii', 'złoty czubek'] };
+const MAT_NAME = { w: 'białego kamienia', g: 'granitu', gold: 'złotego czubka', l: 'żółtego kamienia' };
 const KA_TEXT = { speed: ['Pamięć budowniczych', 'wszystko 1,5× szybciej'], crew: ['Liczniejsza załoga', '+5 robotników na start panowania'], racje: ['Hojniejszy skarbiec', 'racje za blok ×1,5'] };
 const ROMAN = n => { const r = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']]; let o = ''; for (const [v, s] of r) while (n >= v) { o += s; n -= v; } return o; };
 const fmt = n => String(Math.floor(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -39,7 +41,9 @@ function buildPanel() {
     return el;
   };
   const pile = k => { const el = document.createElement('div'); el.className = 'pile'; el.dataset.pile = k; el.innerHTML = `<span>${PILES[k]}</span><div class="bar"><i></i></div><output></output>`; return el; };
-  chain.append(station('quarry'), pile('A'), station('equarry'), pile('E'), station('boat'), pile('W'), station('haul'), pile('B'), station('ramp'), station('mason'), pile('C'), station('place'), station('great'));
+  chain.append(station('quarry'), pile('A'), station('equarry'), pile('E'), station('boat'), pile('W'), station('haul'), pile('B'), pile('Bw'), station('ramp'), station('mason'), pile('C'), pile('Cw'), station('place'), station('great'));
+  const ex = $('expShop'); ex.textContent = '';
+  for (const id in Sim.EXPEDITIONS) { const b = document.createElement('button'); b.type = 'button'; b.className = 'buy'; b.dataset.exp = id; b.innerHTML = `<span class="lab">${EXP_TEXT[id][0]}</span><span class="sub"></span><span class="cost"></span>`; ex.append(b); }
   const shop = $('shop'); shop.textContent = '';
   const item = (buy, arg, label) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'buy'; b.dataset.buy = buy; if (arg) b.dataset.arg = arg; b.innerHTML = `<span class="lab">${label}</span><span class="sub"></span><span class="cost"></span>`; return b; };
   shop.append(item('worker', '', 'Najmij robotnika'));
@@ -55,8 +59,9 @@ const CHIPS = { starved: 'czeka na bloki', blocked: 'stos pełny', empty: 'brak 
 /* Which stations and piles exist right now: the river chain appears when stone is found there, the local one goes when it is spent. */
 function shown(key) {
   const s = g.s;
-  if (key === 'equarry' || key === 'boat' || key === 'E' || key === 'W') return s.east;
+  if (key === 'equarry' || key === 'boat' || key === 'E' || key === 'W' || key === 'Bw' || key === 'Cw') return s.east;
   if (key === 'quarry' || key === 'A') return s.quarryLeft > 0 || s.piles.A > 0;
+  if (key === 'B' || key === 'C') return !s.east || s.quarryLeft > 0 || s.piles.A + s.piles.B + s.piles.C > 0;
   return true;
 }
 
@@ -74,14 +79,17 @@ function updateUi() {
   if (local > 0 && !(s.east && s.assign.equarry > 0 && s.assign.boat > 0)) cands.push(['quarry', local]);
   if (s.east && (local === 0 || s.assign.equarry > 0 || s.assign.boat > 0)) cands.push(['equarry', local + g.capacity('equarry')], ['boat', local + g.capacity('boat')]);
   cands.push(['haul', g.capacity('haul')], ['mason', g.capacity('mason')], ['place', g.capacity('place')]);
-  let bn = null, low = Infinity; for (const [st, c] of cands) if (c < low) { low = c; bn = st; }
+  // a station that is itself waiting on something is a victim, not the cause
+  let bn = null, low = Infinity; for (const [st, c] of cands) { const u = g.status(st); if ((u === 'ok' || u === 'blocked' || u === 'empty') && c < low) { low = c; bn = st; } }
+  const nn = g.nextNeed();
   for (const el of document.querySelectorAll('.st')) {
     const st = el.dataset.st, u = Sim.UNIT[st], status = g.status(st);
     el.hidden = !shown(st); if (el.hidden) continue;
     setText(el.querySelector('[data-f=n]'), String(s.assign[st] / u));
     setText(el.querySelector('[data-f=cap]'), s.assign[st] >= u && status !== 'out' && status !== 'ready' ? `${fmt1(g.capacity(st))}/min` : '');
-    const chip = el.querySelector('[data-f=chip]'), txt = CHIPS[status] || (st === bn && !g.done() ? 'wąskie gardło' : '');
-    setText(chip, txt); chip.className = 'chip' + (status === 'blocked' || status === 'ramp' || status === 'out' ? ' warn' : status === 'starved' || status === 'empty' || status === 'ready' ? ' dim' : txt ? ' hot' : '');
+    const lack = status.startsWith('need-') ? 'brak ' + MAT_NAME[status.slice(5)] : '';
+    const chip = el.querySelector('[data-f=chip]'), txt = lack || CHIPS[status] || (st === bn && !g.done() ? 'wąskie gardło' : '');
+    setText(chip, txt); chip.className = 'chip' + (lack || status === 'blocked' || status === 'ramp' || status === 'out' ? ' warn' : status === 'starved' || status === 'empty' || status === 'ready' ? ' dim' : txt ? ' hot' : '');
     el.querySelector('[data-f=over]').hidden = !s.over[st];
     el.querySelector('[data-act=plus]').disabled = g.free() < u || status === 'out';
     el.querySelector('[data-act=minus]').disabled = s.assign[st] < u;
@@ -91,12 +99,14 @@ function updateUi() {
     el.querySelector('[data-f=meter]').style.width = (100 * clamp(m, 0, 1)).toFixed(0) + '%';
     const note = el.querySelector('[data-f=note]');
     const text = st === 'quarry' ? (s.quarryLeft > 0 ? `w skale zostało ${fmt(s.quarryLeft)} bloków` : 'skała wybrana do końca')
-      : st === 'ramp' && g.rampWanted() ? `do warstwy ${s.rampK + 2}: ${s.rampFill} / ${g.rampNeed(s.rampK + 1)} surowych bloków` : '';
+      : st === 'ramp' && g.rampWanted() ? `do warstwy ${s.rampK + 2}: ${s.rampFill} / ${g.rampNeed(s.rampK + 1)} surowych bloków`
+      : st === 'place' && nn && nn.special ? (nn.inBlocks === 0 ? `teraz potrzeba: ${nn.special === 'g' ? 'granit' : 'złoty czubek'}` : `za ${nn.inBlocks} bloków potrzeba: ${nn.special === 'g' ? 'granit' : 'złoty czubek'}`) : '';
     note.hidden = !text; setText(note, text);
   }
   for (const el of document.querySelectorAll('.pile')) {
     el.hidden = !shown(el.dataset.pile); if (el.hidden) continue;
-    const n = s.piles[el.dataset.pile];
+    const key = el.dataset.pile, n = s.piles[key];
+    setText(el.querySelector('span'), s.east && key === 'B' ? 'surowe żółte na placu' : s.east && key === 'C' ? 'obrobione żółte' : PILES[key]);
     el.querySelector('i').style.width = (100 * n / cap) + '%'; setText(el.querySelector('output'), `${n}/${cap}`);
     el.classList.toggle('full', n >= cap); el.classList.toggle('empty', n === 0);
   }
@@ -116,6 +126,14 @@ function updateUi() {
     b.disabled = off || cur < cost; b.classList.toggle('owned', cost < 0); b.hidden = hide;
   }
   $('kaSec').hidden = !(s.ka > 0 || s.reign > 1);
+  $('expSec').hidden = !s.east;
+  setText($('expStock'), `Na placu: granit ${s.granite}, złoty czubek ${s.gold}.`);
+  for (const b of document.querySelectorAll('[data-exp]')) {
+    const id = b.dataset.exp, e = Sim.EXPEDITIONS[id], left = s.exp[id];
+    setText(b.querySelector('.sub'), left > 0 ? `w drodze, wraca za ${fmtTime(left)}` : `${e.crew} wolnych ludzi na ${fmtTime(e.time)}, przywozi: ${EXP_TEXT[id][1]}${e.n > 1 ? ' ×' + e.n : ''}`);
+    setText(b.querySelector('.cost'), left > 0 ? '…' : fmt(e.cost));
+    b.disabled = left > 0 || g.free() < e.crew || s.racje < e.cost;
+  }
   // the Great Pyramid
   setText($('greatVal'), `${fmt(s.great)} / ${fmt(g.great.total)}`);
   const gc = g.capacity('great');
@@ -136,6 +154,7 @@ const HINTS = [
   ['team', s => s.racje >= 18 && s.placed >= 6, 'Sanie i układanie biorą ludzi czwórkami. Cztery wolne ręce to nowa ekipa.', 10],
   ['ramp', s => g.rampWanted() && s.assign.ramp === 0, 'Wyżej bez rampy nie wejdą. Przydziel ludzi do rampy: sypią ją z surowych bloków, a każda warstwa kosztuje więcej.', 14],
   ['low', s => s.east && s.quarryLeft < 160 && s.quarryLeft > 0 && (s.assign.equarry === 0 || s.assign.boat === 0), 'Miejscowa skała zaraz się skończy. Obsadź kamieniołom za rzeką i barki, zanim stanie cała budowa.', 14],
+  ['pyr', s => s.project === 'pyramid', 'Piramida chce białego kamienia na zewnątrz, żółtego w środku, granitu wokół komory i złotego czubka. Granit i złoto przywożą wyprawy, a każda zabiera ludzi na dłużej.', 18],
   ['over', s => s.blocks >= 30 && !s.over.quarry, 'Odblokowany pierwszy nadzorca. Popędza stację za Ciebie i zostaje na zawsze, także po pochówku.', 12],
   ['great', s => s.workers >= 22 && s.great === 0, 'Masz już sporą załogę. Ekipa wysłana pod Wielką Piramidę nie zarabia racji, ale jej bloki zostają na zawsze i przyspieszają wszystko.', 14],
   ['bank', s => s.bank >= 600, 'Uzbierał się zapas czasu. Przyciski ×3 i ×10 na dole przyspieszają budowę, dopóki go starczy.', 12]
@@ -152,13 +171,14 @@ function openBurial() {
   setText($('burialGain'), `+${gain} Ka`);
   const box = $('burialNext'); box.textContent = '';
   for (const p of Sim.PROJECTS) {
-    const st = Sim.mkStruct(0, 0, p.a, p.b, p.n), ok = s.tombs.length + 1 >= p.need;
+    const st = Sim.mkStruct(0, 0, p.a, p.b, p.n), ok = s.tombs.length + 1 >= p.need && (!p.river || s.east);
     const b = document.createElement('button'); b.type = 'button'; b.className = 'buy'; b.disabled = !ok;
-    b.innerHTML = `<span class="lab">${p.name}</span><span class="sub">${fmt(st.total)} bloków, da około ${Math.round(Math.pow(st.total, 0.6) / 3)} Ka</span><span class="cost">Buduj</span>`;
+    const why = ok ? (p.kind ? 'biała okładzina, granitowa komora, złoty czubek; ' : '') : s.tombs.length + 1 < p.need ? `po ${p.need} grobowcach; ` : 'potrzebny kamień zza rzeki; ';
+    b.innerHTML = `<span class="lab">${p.name}</span><span class="sub">${why}${fmt(st.total)} bloków, około ${Math.round(Math.pow(st.total, 0.6) / 3 * (p.kaMult || 1))} Ka</span><span class="cost">${ok ? 'Buduj' : '—'}</span>`;
     b.onclick = () => { if (g.bury(p.id)) { $('burial').hidden = true; save(true); toast(`Panowanie ${ROMAN(g.s.reign)}. Stary grobowiec zostaje w dolinie.`, 7); } };
     box.append(b);
   }
-  const tease = document.createElement('p'); tease.className = 'note'; tease.textContent = 'Piramida schodkowa: budowniczowie jeszcze nie znają tej techniki.'; box.append(tease);
+  const tease = document.createElement('p'); tease.className = 'note'; tease.textContent = 'Większe piramidy: budowniczowie jeszcze nie znają tej techniki.'; box.append(tease);
   $('burial').hidden = false;
 }
 
@@ -240,6 +260,7 @@ document.addEventListener('click', e => {
     updateUi(); return;
   }
   if (b.dataset.buy && !b.closest('#burialNext')) { if (g.buy(b.dataset.buy, b.dataset.arg)) updateUi(); return; }
+  if (b.dataset.exp) { if (g.startExp(b.dataset.exp)) { toast(`${EXP_TEXT[b.dataset.exp][0]} wyruszyła. Ludzie wrócą za ${fmtTime(Sim.EXPEDITIONS[b.dataset.exp].time)}.`, 7); updateUi(); } return; }
   if (b.dataset.view) { flyTo(Scene.views[b.dataset.view](), b.dataset.view === 'great' ? 2.2 : 1.5); return; }
   if (b.dataset.warp) { warp = Number(b.dataset.warp); if (warp > 1 && g.s.bank < 2) warp = 1; updateUi(); return; }
   if (b.id === 'buryBtn') openBurial();
@@ -278,6 +299,7 @@ function frame(now) {
     else if (ev.type === 'course') toast(g.rampWanted() ? `Warstwa ${ev.k} gotowa. Teraz rampa musi sięgnąć wyżej.` : `Warstwa ${ev.k} gotowa.`);
     else if (ev.type === 'ramp') toast(`Rampa sięga warstwy ${ev.k + 1}.`);
     else if (ev.type === 'east') { toast('Zwiadowcy znaleźli biały kamień za rzeką. Miejscowej skały ubyła połowa: obsadź kamieniołom za rzeką i barki. Widok „Rzeka” pokaże przystań.', 16); save(true); }
+    else if (ev.type === 'exp') toast(ev.id === 'aswan' ? 'Wyprawa wróciła z Asuanu z granitem.' : 'Wyprawa wróciła z Nubii. Złoty czubek czeka na placu.', 8);
     else if (ev.type === 'quarryOut') toast('Miejscowy kamieniołom jest wybrany do końca. Od teraz cały kamień płynie zza rzeki.', 12);
     else if (ev.type === 'done') { toast('Grobowiec gotowy.'); save(true); openBurial(); }
     else if (ev.type === 'reign') { Scene.rebuild(); flyTo(Scene.views.site(), 2); }

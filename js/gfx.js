@@ -36,7 +36,7 @@ const C = {
   sand: '#E9CD8C', rut: '#C3A261',
   stone: { t: '#FBF2D8', l: '#EBDCB2', r: '#C8B283' }, raw: { t: '#E6DABD', l: '#D2C29D', r: '#AF9D76' },
   rock: { t: '#E2C78F', l: '#F1E6CB', r: '#C9B88F' }, mud: { t: '#DDB77E', l: '#C99C60', r: '#A47A44' },
-  ramp: { t: '#CFA36B', l: '#B98A53', r: '#98703F' }, wood: { t: '#B98450', l: '#9C6A3A', r: '#7C5229' },
+  granite: { t: '#B5746A', l: '#9C5C54', r: '#7A433D' }, ramp: { t: '#CFA36B', l: '#B98A53', r: '#98703F' }, wood: { t: '#B98450', l: '#9C6A3A', r: '#7C5229' },
   water: '#3FA9B6', waterD: '#2C8FA3', waterL: '#9ADADB', green: '#86B84F', greenD: '#6CA23E', wheat: '#DCC555', damp: '#C7AE66',
   palm: '#3E8E3B', palmD: '#2E7533', trunk: '#8A5A2B', skin: '#A9683A', skinD: '#8A522B', kilt: '#FFF8E6', hair: '#2A1B12',
   shadow: 'rgba(96,60,20,0.22)'
@@ -49,7 +49,7 @@ const SPR = {
   house_a: { w: 420, h: 430, ax: 209.6, ay: 421.2 }, house_b: { w: 520, h: 510, ax: 263.8, ay: 507.3 },
   hut: { w: 440, h: 545, ax: 170.8, ay: 495.4 }, granary: { w: 520, h: 464, ax: 262.5, ay: 419.5 },
   workshop: { w: 460, h: 509, ax: 232.7, ay: 489.6 }, boat: { w: 420, h: 416, ax: 210, ay: 324.5 },
-  barge_e: { w: 460, h: 460, ax: 226, ay: 222 }, barge_w: { w: 460, h: 456, ax: 232, ay: 230, vs: 0.76 }   // vs: squash to the game's 2:1 projection
+  barge_e: { w: 460, h: 460, ax: 226, ay: 222 }, barge_w: { w: 460, h: 456, ax: 232, ay: 230, vs: 0.76 }, barge_n: { w: 460, h: 467, ax: 228, ay: 236, vs: 0.76 }   // vs: squash to the game's 2:1 projection
 };
 // units = how many world units one repeat of the texture covers
 const TEX = { sand: { units: 26 }, water: { units: 22 }, grass: { units: 14 }, crops: { units: 6 }, wheat: { units: 6 }, stone: { units: 5 }, strata: { units: 9 }, earth: { units: 8 } };
@@ -123,8 +123,9 @@ function drawGhost(st, strong) {
   ctx.globalAlpha = 1;
 }
 const TONES = []; for (let i = -8; i <= 8; i++) TONES.push(i === 0 ? null : i > 0 ? `rgba(255,255,255,${(i * 0.035).toFixed(3)})` : `rgba(120,84,30,${(-i * 0.03).toFixed(3)})`);
+const MAT_TINT = { l: 'rgba(204,156,74,0.5)', g: 'rgba(140,54,48,0.66)' };      // local stone is yellower, granite is red; white casing stays as painted
 /* One rectangle of laid blocks inside a course: columns [i0, i0+w), rows [j0, j0+d). */
-function slab(c, i0, w, j0, d, lod, topOpen, fl) {
+function slab(st, c, i0, w, j0, d, lod, topOpen, fl) {
   const x = c.x0 + i0, y = c.y0 + j0, z = c.z, h = BH, col = C.stone;
   if (lod < 2) { box(x, y, z, w, d, h, col, lod === 1 ? 1 : 0, 'stone'); return; }
   const A = P(x, y, z + h), B = P(x + w, y, z + h), Cc = P(x + w, y + d, z + h), D = P(x, y + d, z + h);
@@ -140,6 +141,8 @@ function slab(c, i0, w, j0, d, lod, topOpen, fl) {
   ctx.lineWidth = clamp(cam.T / 40, 0.5, 1); ctx.strokeStyle = 'rgba(74,46,22,0.3)'; ctx.lineJoin = 'round';
   const cell = (pts, i, j, extra) => {              // every block gets its own slight tone and its joints
     path(pts);
+    const mt = st.kind ? MAT_TINT[Sim.matAt(st, c.k, i, j)] : null;
+    if (mt) { ctx.fillStyle = mt; ctx.fill(); }
     const f = extra || TONES[Math.round((hsh(c.k * 7919 + i, j, 3) - 0.5) * 16) + 8];
     if (f) { ctx.fillStyle = f; ctx.fill(); }
     ctx.stroke();
@@ -164,19 +167,34 @@ function drawStruct(st, placed, flash) {
   const fl = flash && flash.t > 0.02 && flash.idx >= 0 ? Object.assign(Sim.locate(st, flash.idx), { t: flash.t }) : null;
   for (const c of st.courses) {
     if (placed <= c.start) break;
+    if (st.kind === 'pyr' && c.k === st.n - 1) { capstone(c.x0, c.y0, c.z, 1); break; }    // the top block is the golden capstone
     const pk = Math.min(c.cap, placed - c.start), open = c.k >= cur - 1;
-    if (pk >= c.cap) { slab(c, 0, c.a, 0, c.b, lod, open, fl); continue; }
+    if (pk >= c.cap) { slab(st, c, 0, c.a, 0, c.b, lod, open, fl); continue; }
     if (!st.strip) {
       const I = Math.floor(pk / c.b), J = pk % c.b;
-      if (I > 0) slab(c, 0, I, 0, c.b, lod, open, fl);
-      if (J > 0) slab(c, I, 1, 0, J, lod, open, fl);
+      if (I > 0) slab(st, c, 0, I, 0, c.b, lod, open, fl);
+      if (J > 0) slab(st, c, I, 1, 0, J, lod, open, fl);
     } else {                                           // strips grow from the front corner: far pieces first
       const full = c.a * st.strip, sN = Math.min(Math.floor(pk / full), Math.ceil(c.b / st.strip) - 1);
       const rows = Math.min(st.strip, c.b - sN * st.strip), r2 = pk - sN * full, I = Math.floor(r2 / rows), J = r2 % rows, jTop = c.b - sN * st.strip;
-      if (J > 0) slab(c, c.a - I - 1, 1, jTop - J, J, lod, open, fl);
-      if (I > 0) slab(c, c.a - I, I, jTop - rows, rows, lod, open, fl);
-      if (sN > 0) slab(c, 0, c.a, jTop, sN * st.strip, lod, open, fl);
+      if (J > 0) slab(st, c, c.a - I - 1, 1, jTop - J, J, lod, open, fl);
+      if (I > 0) slab(st, c, c.a - I, I, jTop - rows, rows, lod, open, fl);
+      if (sN > 0) slab(st, c, 0, c.a, jTop, sN * st.strip, lod, open, fl);
     }
+  }
+}
+
+/* A golden pyramidion standing on a square of side w at (x, y, z). */
+function capstone(x, y, z, w) {
+  const h = w * 1.25, ap = P(x + w / 2, y + w / 2, z + h), a = P(x, y + w, z), b = P(x + w, y + w, z), c2 = P(x + w, y, z);
+  if (ap[0] < -40 || ap[0] > V.W + 40 || b[1] < -40 || ap[1] > V.H + 40) return;
+  fillPoly([a, b, ap], '#F6D66A'); fillPoly([b, c2, ap], '#C6952A');
+  ctx.strokeStyle = '#7A5412'; ctx.lineWidth = inkW(); ctx.lineJoin = 'round'; ctx.globalAlpha = 0.8;
+  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c2[0], c2[1]); ctx.lineTo(ap[0], ap[1]); ctx.closePath(); ctx.moveTo(b[0], b[1]); ctx.lineTo(ap[0], ap[1]); ctx.stroke(); ctx.globalAlpha = 1;
+  if (cam.T >= 5) {                                                // a glint on the lit face
+    const gx = lerp(a[0], ap[0], 0.55) + (b[0] - a[0]) * 0.18, gy = lerp(a[1], ap[1], 0.55), r = clamp(cam.T * 0.12, 1, 5);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = Math.max(1, r * 0.35);
+    line([gx - r, gy], [gx + r, gy]); line([gx, gy - r], [gx, gy + r]);
   }
 }
 
@@ -230,5 +248,5 @@ function resize() {
   cv.width = Math.round(V.W * V.DPR); cv.height = Math.round(V.H * V.DPR);
 }
 window.G = { BH, ZK, HUMAN, cv, ctx, cam, V, P, unproj, visBox, clamp, lerp, hsh, shade, INK, C, SPR, TEX, texLevel, matGround, matFaceY, matFaceX, SH_L, SH_R,
-  path, fillPoly, texPoly, line, inkW, box, drawGhost, drawStruct, worker, spriteAt, groundShadow, resize };
+  path, fillPoly, texPoly, line, inkW, box, drawGhost, drawStruct, capstone, worker, spriteAt, groundShadow, resize };
 })();

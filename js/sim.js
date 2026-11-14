@@ -22,19 +22,33 @@ const L = {
 };
 const PROJECTS = [
   { id: 'mastaba', name: 'Mastaba', a: 12, b: 8, n: 4, need: 0 },
-  { id: 'mastaba2', name: 'Wielka mastaba', a: 18, b: 12, n: 6, need: 1 }
+  { id: 'mastaba2', name: 'Wielka mastaba', a: 18, b: 12, n: 6, need: 1 },
+  // the first true pyramid: white casing, a granite chamber inside, a golden capstone; a steeper ramp or it would not fit
+  { id: 'pyramid', name: 'Mała piramida', a: 14, b: 14, n: 14, need: 2, kind: 'pyr', slope: 3, kaMult: 2.5, river: true }
 ];
+/* Expeditions: a crew leaves for a while and comes back with something the valley does not have. */
+const EXPEDITIONS = { aswan: { crew: 8, cost: 60, time: 480, res: 'granite', n: 8 }, nubia: { crew: 12, cost: 200, time: 900, res: 'gold', n: 1 } };
+const PAY = { w: 2, g: 5, gold: 60 };
 const OVERSEERS = { quarry: { need: 30, cost: 60 }, haul: { need: 60, cost: 120 }, mason: { need: 96, cost: 200 }, ramp: { need: 200, cost: 260 }, place: { need: 150, cost: 320 }, great: { need: 278, cost: 500 }, equarry: { need: 900, cost: 450 }, boat: { need: 1000, cost: 600 } };
 const KA = { speed: { base: 5, grow: 3 }, crew: { base: 3, grow: 2 }, racje: { base: 4, grow: 3 } };
 const BASE = { quarry: 1 / 40, equarry: 1 / 40, mason: 1 / 30, ramp: 1 / 18, boatV: 1.3, boatCap: 6, boatLoad: 0.7, boatWait: 14, haulV: 0.95, haulBack: 1.7, placeV: 0.85, placeBack: 1.6, placeTime: 3, unload: 0.7, laneGap: 2.6, handSec: 1.5, overseerRate: 1, boostAdd: 0.7, boostMax: 6, bankCap: 12 * 3600 };
 
-function mkStruct(ox, oy, a, b, n, strip) {
+function mkStruct(ox, oy, a, b, n, strip, kind) {
   const courses = []; let cum = 0;
   for (let k = 0; k < n; k++) {
     const c = { k, a: a - k, b: b - k, x0: ox + k / 2, y0: oy + k / 2, z: k * BH, start: cum };
     c.cap = c.a * c.b; cum += c.cap; courses.push(c);
   }
-  return { ox, oy, a, b, n, courses, total: cum, strip: strip || 0 };
+  return { ox, oy, a, b, n, courses, total: cum, strip: strip || 0, kind: kind || null };
+}
+/* Which stone a block must be: null = any. A pyramid wants white casing outside, granite around the chamber, gold on top. */
+function matAt(st, k, i, j) {
+  if (st.kind !== 'pyr') return null;
+  if (k === st.n - 1) return 'gold';
+  const c = st.courses[k], h = Math.floor(c.a / 2);
+  if (i === 0 || j === 0 || i === c.a - 1 || j === c.b - 1) return 'w';
+  if ((k === 2 || k === 3) && (i === h - 1 || i === h) && (j === h - 1 || j === h)) return 'g';
+  return 'l';
 }
 function courseOf(st, m) { for (const c of st.courses) if (m < c.start + c.cap) return c.k; return st.n; }
 /* Where block number m sits. Tombs fill far-to-near (crews retreat towards the ramp);
@@ -52,14 +66,14 @@ function locate(st, m) {
 }
 
 /* Raw blocks of fill it takes to raise the ramp from course k-1 to course k: the wedge grows with the square of its height. */
-const rampNeed = k => Math.round(5.33 * (2 * k - 1));
+const rampNeed = (k, slope) => Math.round(0.888 * (slope || 6) * (2 * k - 1));
 
 function fresh() {
   return {
     v: 2, t: 0, played: 0, savedAt: 0, reign: 1, project: 'mastaba', siteY: 0, placed: 0, great: 0, racje: 8, workers: 10, hints: {},
-    assign: { quarry: 1, equarry: 0, boat: 0, haul: 4, mason: 1, ramp: 0, place: 4, great: 0 }, piles: { A: 3, B: 2, C: 3, E: 0, W: 0 },
+    assign: { quarry: 1, equarry: 0, boat: 0, haul: 4, mason: 1, ramp: 0, place: 4, great: 0 }, piles: { A: 3, B: 2, C: 3, E: 0, W: 0, Bw: 0, Cw: 0 },
     lvl: { quarry: 0, equarry: 0, boat: 0, haul: 0, mason: 0, ramp: 0, place: 0, great: 0, pile: 0, hand: 0 }, over: {}, wq: 0, wm: 0, we: 0, wr: 0,
-    quarryLeft: L.quarryTotal, east: false, rampK: 0, rampFill: 0,
+    quarryLeft: L.quarryTotal, east: false, rampK: 0, rampFill: 0, granite: 0, gold: 0, away: 0, exp: { aswan: 0, nubia: 0 },
     ka: 0, kaLvl: { speed: 0, crew: 0, racje: 0 }, tombs: [], blocks: 0, clicks: 0, bank: 0
   };
 }
@@ -82,17 +96,19 @@ function create(saved) {
   const g = {
     s, BH, great: mkStruct(L.greatFront[0] - L.greatN, L.greatFront[1] - L.greatN, L.greatN, L.greatN, L.greatN, L.greatStrip),
     site: null, teams: { haul: [], place: [], great: [], boat: [] }, inFlight: { place: 0, great: 0 }, boost: { haul: 0, place: 0, great: 0, boat: 0 },
-    rampZ: 0, events: [], lane: {}, flash: { place: { idx: -1, t: 0 }, great: { idx: -1, t: 0 } }, stamps: [], rate: 0, handPulse: {}
+    rampZ: 0, rampDown: 0, events: [], lane: {}, flash: { place: { idx: -1, t: 0 }, great: { idx: -1, t: 0 } }, stamps: [], rate: 0, handPulse: {}
   };
   const project = () => PROJECTS.find(p => p.id === s.project) || PROJECTS[0];
-  function setSite() { const p = project(); g.site = mkStruct(L.eastX - p.a, s.siteY, p.a, p.b, p.n); if (s.rampK < 0) { s.rampK = workCourse(); s.rampFill = 0; } rampSync(); }
-  function rampSync() { g.rampZ = (s.rampK + (s.rampK < g.site.n - 1 ? s.rampFill / rampNeed(s.rampK + 1) : 0)) * BH; }
+  const slope = () => project().slope || L.rampSlope;
+  const need = k => rampNeed(k, slope());
+  function setSite() { const p = project(); g.site = mkStruct(L.eastX - p.a, s.siteY, p.a, p.b, p.n, 0, p.kind); if (s.rampK < 0) { s.rampK = workCourse(); s.rampFill = 0; } rampSync(); }
+  function rampSync() { g.rampZ = (s.rampK + (s.rampK < g.site.n - 1 ? s.rampFill / need(s.rampK + 1) : 0)) * BH * (1 - g.rampDown); }
   const done = () => s.placed >= g.site.total;
   const workCourse = () => Math.min(courseOf(g.site, s.placed), g.site.n - 1);
   const rampMid = () => g.site.oy + g.site.b / 2;
   const rampEdge = () => L.eastX - Math.max(0, Math.max(s.rampK, 1) - 1) / 2;
   const cap = () => 8 + 4 * s.lvl.pile;
-  const free = () => s.workers - STATIONS.reduce((n, k) => n + s.assign[k], 0);
+  const free = () => s.workers - s.away - STATIONS.reduce((n, k) => n + s.assign[k], 0);
   const startWorkers = () => 10 + 5 * s.kaLvl.crew;
   const globalMult = () => Math.pow(1.5, s.kaLvl.speed) * (1 + 0.02 * Math.sqrt(s.great));
   const mult = st => Math.pow(1.25, s.lvl[st]) * globalMult();
@@ -104,7 +120,7 @@ function create(saved) {
   function surfaceZ(x, y) {
     const zt = g.rampZ, kc = workCourse(), mid = rampMid();
     if (zt > 0.001) {
-      const len = zt * L.rampSlope;
+      const len = zt * slope();
       if (Math.abs(y - mid) <= L.rampHalf + 0.01 && x >= rampEdge() - 0.05 && x <= L.eastX + len) return x <= L.eastX ? zt : zt * (1 - (x - L.eastX) / len);
     }
     if (kc >= 1) {
@@ -114,14 +130,38 @@ function create(saved) {
     return 0;
   }
 
+  /* Take one dressed block of the wanted stone off the yard. Core blocks take local stone, or white once the local stone is gone for good. */
+  const localGone = () => !localStone() && s.piles.A + s.piles.B + s.piles.C === 0;
+  function canTake(req) {
+    if (req === 'g') return s.granite > 0 ? 'g' : null;
+    if (req === 'gold') return s.gold > 0 ? 'gold' : null;
+    if (req === 'w') return s.piles.Cw > 0 ? 'w' : null;
+    if (s.piles.C > 0) return 'l';
+    return s.piles.Cw > 0 && (req === null || localGone()) ? 'w' : null;
+  }
+  function takeDressed(req) {
+    const m = canTake(req);
+    if (m === 'g') s.granite--; else if (m === 'gold') s.gold--; else if (m === 'w') s.piles.Cw--; else if (m === 'l') s.piles.C--;
+    return m;
+  }
+  /* What the wall asks for next, and how soon it will ask for something an expedition has to fetch. */
+  function nextNeed() {
+    const idx = s.placed + g.inFlight.place; if (idx >= g.site.total) return null;
+    const at = m => { const t = locate(g.site, m); return matAt(g.site, t.k, t.i, t.j); };
+    const out = { now: at(idx), special: null, inBlocks: 0 };
+    if (g.site.kind) { let g2 = s.granite, au = s.gold;
+      for (let m = idx; m < Math.min(g.site.total, idx + 400); m++) { const r = at(m); if (r === 'g' && --g2 < 0) { out.special = 'g'; out.inBlocks = m - idx; break; } if (r === 'gold' && --au < 0) { out.special = 'gold'; out.inBlocks = m - idx; break; } } }
+    return out;
+  }
+
   /* ---------- crews with sledges ---------- */
   const LANES = [0, -1, 1, -2, 2];
   function home(kind, i, base) {
     const ln = LANES[i % 5], row = Math.floor(i / 5);
     if (kind === 'haul') return base === 'W' ? [L.harborRoad[0][0] + row * 1.7, L.harborRoad[0][1] + ln * 0.9] : [L.roadAB[0][0] + ln * 1.5, L.roadAB[0][1] - row * 1.6];
-    if (kind === 'place') return [33.4 + ln * 1.7, 2.4 + row * 1.5];
+    if (kind === 'place') return [33.4 + ln * 1.7, 2.6 + row * 1.5];
     if (kind === 'boat') return [L.dockE[0] - row * 9, L.dockE[1] + ln * 2.6];
-    return [29.6 + ln * 1.5, -1.6 + row * 1.5];
+    return [25.6 + ln * 1.5, -1.6 + row * 1.5];
   }
   function mkTeam(kind, i) {
     const base = kind === 'haul' ? (localStone() || s.piles.A > 0 ? 'A' : 'W') : null, h = home(kind, i, base);
@@ -166,7 +206,8 @@ function create(saved) {
       if (follow(tm, dt * speed(tm, BASE.haulV))) { tm.state = 'unload'; tm.t = 0; }
     } else if (tm.state === 'unload') {
       tm.t += dt;
-      if (tm.t > BASE.unload && s.piles.B < cap()) { s.piles.B++; tm.loaded = false; go(tm, routeFromB(tm), 'back'); }
+      const dest = tm.from === 'W' ? 'Bw' : 'B';                    // white stone from the river is kept apart from the local stone
+      if (tm.t > BASE.unload && s.piles[dest] < cap()) { s.piles[dest]++; tm.loaded = false; go(tm, routeFromB(tm), 'back'); }
     } else if (follow(tm, dt * speed(tm, BASE.haulBack))) tm.state = 'wait';
   }
   /* Barges carry stone in batches: they fill up at the east jetty, cross, and empty onto the west one. */
@@ -187,7 +228,7 @@ function create(saved) {
   function placed(kind, tm) {
     if (kind === 'place') {
       const k = tm.target.k; s.placed++; s.blocks++;
-      const pay = 2 * (1 + 0.5 * k) * Math.pow(1.5, s.kaLvl.racje); s.racje += pay;
+      const pay = 2 * (1 + 0.5 * k) * (PAY[tm.req] || 1) * Math.pow(1.5, s.kaLvl.racje); s.racje += pay;
       g.flash.place = { idx: tm.idx, t: 1 };
       g.stamps.push(s.t); if (g.stamps.length > 16) g.stamps.shift();
       g.events.push({ type: 'placed', x: tm.target.x, y: tm.target.y, z: tm.target.z + BH, pay });
@@ -202,13 +243,15 @@ function create(saved) {
   function stepPlace(tm, dt) {
     if (tm.state === 'wait') {
       const idx = s.placed + g.inFlight.place;
-      if (tm.retire || s.piles.C <= 0 || idx >= g.site.total || !laneFree(tm)) return;
+      if (tm.retire || idx >= g.site.total || !laneFree(tm)) return;
       const tg = locate(g.site, idx), kc = workCourse();
       if (tg.k !== kc || s.rampK < kc) return;
-      depart(tm); s.piles.C--; g.inFlight.place++; tm.loaded = true; tm.target = tg; tm.idx = idx;
-      const ym = rampMid() + Math.max(-1, Math.min(1, tm.lane)) * 0.3, len = g.rampZ * L.rampSlope;
-      const sx = Math.min(tg.x + 3.3, L.eastX + 0.4), sy = sx >= L.eastX + 0.3 ? ym : tg.y + (ym - tg.y) * 0.25;
-      tm.ramp = [[Math.min(31, Math.max(L.eastX + len + 5, 22)), ym + tm.lane * 0.5], [L.eastX + len + 1.4, ym], [L.eastX + 0.4, ym]];
+      const req = matAt(g.site, tg.k, tg.i, tg.j), mat = takeDressed(req); if (!mat) return;
+      depart(tm); g.inFlight.place++; tm.loaded = true; tm.target = tg; tm.idx = idx; tm.req = req; tm.mat = mat;
+      const ym = rampMid() + Math.max(-1, Math.min(1, tm.lane)) * 0.3, len = g.rampZ * slope(), edge = rampEdge();
+      // stop beside the block; on the narrow top courses there is no room, so the sledge stays on the ramp's landing
+      const sx = Math.min(tg.x + 3.3, L.eastX + 0.4), sy = sx >= edge - 0.2 ? ym : tg.y + (ym - tg.y) * 0.25;
+      tm.ramp = [[Math.max(L.eastX + len + 5, 22), ym + tm.lane * 0.5], [L.eastX + len + 1.4, ym], [L.eastX + 0.4, ym]];
       const pts = tm.ramp.slice(); if (sx < L.eastX + 0.3) pts.push([sx, sy]);
       go(tm, pts, 'go');
     } else if (tm.state === 'go') {
@@ -221,8 +264,9 @@ function create(saved) {
   function stepGreat(tm, dt) {
     if (tm.state === 'wait') {
       const idx = s.great + g.inFlight.great;
-      if (tm.retire || s.piles.C <= 0 || idx >= g.great.total || !laneFree(tm)) return;
-      depart(tm); s.piles.C--; g.inFlight.great++; tm.loaded = true; tm.idx = idx;
+      if (tm.retire || idx >= g.great.total || !laneFree(tm)) return;
+      const mat = takeDressed(null); if (!mat) return;
+      depart(tm); g.inFlight.great++; tm.loaded = true; tm.idx = idx; tm.mat = mat;
       const tg = tm.target = locate(g.great, idx);
       tm.ramp = L.greatRoad.map(p => [p[0], p[1] + tm.lane * 0.9]);
       tm.ramp.push([tg.x - 1.5, L.greatFront[1] + 2.3], [tg.x - 1.5, tg.y]);
@@ -265,17 +309,26 @@ function create(saved) {
       while (s.we >= 1 && s.piles.E < c) { s.piles.E++; s.we -= 1; }
     }
     if (s.we > 1) s.we = 1;
-    if (s.piles.B > 0 && s.piles.C < c) s.wm += dt * s.assign.mason * BASE.mason * mult('mason');
-    while (s.wm >= 1 && s.piles.B > 0 && s.piles.C < c) { s.piles.B--; s.piles.C++; s.wm -= 1; }
+    // masons dress whichever stone has room on the dressed side; with both waiting, the one the yard is shorter of
+    const pick = () => { const l = s.piles.B > 0 && s.piles.C < c, w = s.piles.Bw > 0 && s.piles.Cw < c; return l && w ? (s.piles.Cw < s.piles.C ? 'w' : 'l') : l ? 'l' : w ? 'w' : null; };
+    if (pick()) s.wm += dt * s.assign.mason * BASE.mason * mult('mason');
+    for (let m = pick(); s.wm >= 1 && m; m = pick()) { if (m === 'l') { s.piles.B--; s.piles.C++; } else { s.piles.Bw--; s.piles.Cw++; } s.wm -= 1; }
     if (s.wm > 1) s.wm = 1;
     if (rampWanted()) {                                              // the ramp is piled up from raw stone, a course at a time
-      if (s.piles.B > 0) s.wr += dt * s.assign.ramp * BASE.ramp * mult('ramp');
-      while (s.wr >= 1 && s.piles.B > 0 && rampWanted()) {
-        s.piles.B--; s.wr -= 1; s.rampFill++;
-        if (s.rampFill >= rampNeed(s.rampK + 1)) { s.rampK++; s.rampFill = 0; g.events.push({ type: 'ramp', k: s.rampK }); }
+      if (s.piles.B + s.piles.Bw > 0) s.wr += dt * s.assign.ramp * BASE.ramp * mult('ramp');
+      while (s.wr >= 1 && s.piles.B + s.piles.Bw > 0 && rampWanted()) {
+        if (s.piles.B > 0) s.piles.B--; else s.piles.Bw--;
+        s.wr -= 1; s.rampFill++;
+        if (s.rampFill >= need(s.rampK + 1)) { s.rampK++; s.rampFill = 0; g.events.push({ type: 'ramp', k: s.rampK }); }
       }
     }
+    for (const id in EXPEDITIONS) if (s.exp[id] > 0) {               // expeditions come home
+      s.exp[id] -= dt;
+      if (s.exp[id] <= 0) { const e = EXPEDITIONS[id]; s.exp[id] = 0; s.away -= e.crew; s[e.res] += e.n; g.events.push({ type: 'exp', id }); }
+    }
     if (s.wr > 1) s.wr = 1;
+    // once the last block is in and the crews are off it, the ramp is taken down so the tomb stands clear
+    if (done() && g.teams.place.every(t => t.state === 'wait')) g.rampDown = Math.min(1, g.rampDown + dt / 14);
     rampSync();
     syncTeams();
     for (const tm of g.teams.haul) { tm.ph += dt * (tm.state === 'go' ? 7 : tm.state === 'back' ? 9 : 0); stepHaul(tm, dt); }
@@ -312,11 +365,15 @@ function create(saved) {
     if (what === 'ka') { if (!KA[arg] || s.ka < costs.ka(arg)) return false; s.ka -= costs.ka(arg); s.kaLvl[arg]++; return true; }
     return false;
   }
-  const kaGain = () => Math.round(Math.pow(g.site.total, 0.6) / 3);
+  function startExp(id) {
+    const e = EXPEDITIONS[id]; if (!e || !s.east || s.exp[id] > 0 || free() < e.crew || s.racje < e.cost) return false;
+    s.racje -= e.cost; s.away += e.crew; s.exp[id] = e.time; g.events.push({ type: 'expGo', id }); return true;
+  }
+  const kaGain = () => Math.round(Math.pow(g.site.total, 0.6) / 3 * (project().kaMult || 1));
   /* The pharaoh is buried: the tomb stays in the valley for good, the building site starts over. */
   function bury(nextId) {
     if (!done()) return false;
-    const next = PROJECTS.find(p => p.id === nextId && s.tombs.length + 1 >= p.need); if (!next) return false;
+    const next = PROJECTS.find(p => p.id === nextId && s.tombs.length + 1 >= p.need && (!p.river || s.east)); if (!next) return false;
     const p = project();
     s.ka += kaGain();
     s.tombs.push({ id: p.id, a: p.a, b: p.b, n: p.n, ox: g.site.ox, oy: g.site.oy, reign: s.reign });
@@ -324,11 +381,12 @@ function create(saved) {
     s.workers = startWorkers();
     const loc = localStone();
     s.assign = { quarry: loc ? 1 : 0, equarry: loc ? 0 : 1, boat: 0, haul: 4, mason: 1, ramp: 0, place: 4, great: 0 };
-    s.piles = { A: loc ? 3 : 0, B: 2, C: 3, E: 0, W: loc ? 0 : 6 };
+    s.piles = { A: loc ? 3 : 0, B: loc ? 2 : 0, C: loc ? 3 : 0, E: 0, W: loc ? 0 : 6, Bw: loc ? 0 : 2, Cw: loc ? 0 : 3 };
+    s.away = 0; s.exp = { aswan: 0, nubia: 0 };                     // crews still away are called back empty-handed
     s.lvl = { quarry: 0, equarry: 0, boat: 0, haul: 0, mason: 0, ramp: 0, place: 0, great: 0, pile: 0, hand: 0 };
     s.wq = 0; s.wm = 0; s.we = 0; s.wr = 0; s.rampK = 0; s.rampFill = 0;
     g.teams = { haul: [], place: [], great: [], boat: [] }; g.inFlight = { place: 0, great: 0 }; g.boost = { haul: 0, place: 0, great: 0, boat: 0 }; g.stamps = []; g.rate = 0; g.lane = {};
-    setSite(); syncTeams();
+    g.rampDown = 0; setSite(); syncTeams();
     g.events.push({ type: 'reign' });
     return true;
   }
@@ -349,7 +407,7 @@ function create(saved) {
       return up * sum;
     }
     let d;
-    if (st === 'place') { const len = g.rampZ * L.rampSlope; d = Math.hypot(33.4 - (L.eastX + len), 2.4 - rampMid()) + len + 5; }
+    if (st === 'place') { const len = g.rampZ * slope(); d = Math.hypot(33.4 - (L.eastX + len), 2.4 - rampMid()) + len + 5; }
     else { const tg = locate(g.great, Math.min(s.great, g.great.total - 1)); d = 108 + Math.abs(tg.x - L.greatFront[0]) + Math.abs(tg.y - L.greatFront[1]); }
     return up * Math.min(60 * n / (d / (BASE.placeV * m) + d / (BASE.placeBack * m) + BASE.placeTime / m), 5 * 60 * m / BASE.laneGap);
   }
@@ -362,25 +420,30 @@ function create(saved) {
     if (st === 'quarry') return s.piles.A >= c ? 'blocked' : 'ok';
     if (st === 'equarry') return s.piles.E >= c ? 'blocked' : 'ok';
     if (st === 'boat') return s.piles.E <= 0 && g.teams.boat.every(t => t.state === 'load' && t.cargo === 0) ? 'starved' : s.piles.W >= c && g.teams.boat.some(t => t.state === 'unload') ? 'blocked' : 'ok';
-    if (st === 'haul') return s.piles.A + s.piles.W <= 0 && g.teams.haul.every(t => t.state === 'wait') ? 'starved' : s.piles.B >= c && g.teams.haul.some(t => t.state === 'unload' && t.t > 1) ? 'blocked' : 'ok';
-    if (st === 'mason') return s.piles.B <= 0 ? 'starved' : s.piles.C >= c ? 'blocked' : 'ok';
-    if (st === 'ramp') return s.piles.B <= 0 ? 'starved' : 'ok';
-    if (st === 'place') return done() ? 'done' : s.rampK < workCourse() ? 'ramp' : s.piles.C <= 0 && g.teams.place.every(t => t.state === 'wait') ? 'starved' : 'ok';
-    return s.piles.C <= 0 && g.teams.great.every(t => t.state === 'wait') ? 'starved' : 'ok';
+    if (st === 'haul') return s.piles.A + s.piles.W <= 0 && g.teams.haul.every(t => t.state === 'wait') ? 'starved' : g.teams.haul.some(t => t.state === 'unload' && t.t > 1) ? 'blocked' : 'ok';
+    if (st === 'mason') return s.piles.B + s.piles.Bw <= 0 ? 'starved' : (s.piles.B === 0 || s.piles.C >= c) && (s.piles.Bw === 0 || s.piles.Cw >= c) ? 'blocked' : 'ok';
+    if (st === 'ramp') return s.piles.B + s.piles.Bw <= 0 ? 'starved' : 'ok';
+    const idle = k => g.teams[k].every(t => t.state === 'wait');
+    if (st === 'place') {
+      if (done()) return 'done'; if (s.rampK < workCourse()) return 'ramp';
+      const nn = nextNeed(); if (nn && idle('place') && !canTake(nn.now)) return nn.now && (nn.now !== 'l' || s.piles.Cw > 0) ? 'need-' + nn.now : 'starved';
+      return 'ok';
+    }
+    return s.piles.C + s.piles.Cw <= 0 && idle('great') ? 'starved' : 'ok';
   }
   /* A copy of the state safe to store: blocks riding on sledges go back to the pile they came from. */
   function snapshot() {
     const o = JSON.parse(JSON.stringify(s));
     for (const t of g.teams.haul) if (t.loaded) o.piles[t.from || 'A']++;
     for (const t of g.teams.boat) o.piles.E += t.cargo;
-    o.piles.C += g.inFlight.place + g.inFlight.great;
+    for (const t of g.teams.place.concat(g.teams.great)) if (t.loaded && t.state !== 'back') { if (t.mat === 'g') o.granite++; else if (t.mat === 'gold') o.gold++; else o.piles[t.mat === 'w' ? 'Cw' : 'C']++; }
     o.savedAt = Date.now();
     return o;
   }
   setSite(); syncTeams();
-  return Object.assign(g, { step, click, buy, bury, setAssign, costs, capacity, status, snapshot, surfaceZ, done, workCourse, rampMid, rampEdge, cap, free, mult, globalMult, handMult, kaGain, project, teamsWanted, startWorkers, localStone, rampWanted, rampNeed });
+  return Object.assign(g, { step, click, buy, bury, setAssign, costs, capacity, status, snapshot, surfaceZ, done, workCourse, rampMid, rampEdge, cap, free, mult, globalMult, handMult, kaGain, project, teamsWanted, startWorkers, localStone, rampWanted, rampNeed: need, slope, nextNeed, startExp, canTake });
 }
 
-const Sim = { BH, TEAM, STATIONS, UNIT, L, PROJECTS, OVERSEERS, KA, BASE, mkStruct, courseOf, locate, create, fresh, rampNeed };
+const Sim = { BH, TEAM, STATIONS, UNIT, L, PROJECTS, OVERSEERS, KA, BASE, EXPEDITIONS, mkStruct, courseOf, locate, matAt, create, fresh, rampNeed };
 if (typeof module !== 'undefined' && module.exports) module.exports = Sim; else root.Sim = Sim;
 })(typeof window !== 'undefined' ? window : globalThis);
